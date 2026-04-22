@@ -6,24 +6,28 @@
       "name": "Soldier",
       "text": "umm you get the vibes.",
       "imagePath": "assets/profiles/soldier.jpg",
+      "targetSceneKey": "hack-and-slash"
     },
     {
       "id": "cat",
       "name": "Cat",
       "text": "elegant, mysterious, and an absolute gentleman.",
       "imagePath": "assets/profiles/cat.jpg",
+      "targetSceneKey": "dialogue"
     },
     {
       "id": "clown",
       "name": "Clown",
       "text": "chaotic energy, the disgusts of the clown.",
       "imagePath": "assets/profiles/clown.jpg",
+      "targetSceneKey": "strategy"
     },
     {
       "id": "surrender",
       "name": "Surrender",
-      "text": "paws up and no resistance, acceptance and pure harmless chaos .",
+      "text": "paws up and no resistance, acceptance and pure harmless chaos.",
       "imagePath": "assets/profiles/surrender.jpg",
+      "targetSceneKey": "dialogue"
     }
   ]
 }
