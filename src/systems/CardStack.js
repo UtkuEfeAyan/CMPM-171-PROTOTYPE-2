@@ -1,107 +1,50 @@
-// cardstack manages the queue of profile cards
-// keeps track of which card is active and emits events when cards are destroyed
+// simple card queue manager
+// just tracks which card we're on and emits events
 
 export class CardStack extends Phaser.Events.EventEmitter {
   constructor() {
     super();
-    this.profiles = [];          // array of all profile data from json
-    this.currentIndex = 0;       // which card we're on right now
-    this.cardInstances = new Map(); // references to the actual card objects
+    this.profiles = [];
+    this.currentIndex = 0;
+    console.log("[CardStack] created");
   }
 
-  // load profile data into the stack
+  // load profiles
   init(profilesData) {
-    if (!profilesData || profilesData.length === 0) {
-      throw new Error("need some profiles to start");
-    }
-    
+    console.log(`[CardStack] init with ${profilesData.length} profiles`);
     this.profiles = profilesData;
     this.currentIndex = 0;
-    this.cardInstances.clear();
-
-    console.log(`loaded ${this.profiles.length} profiles`);
-    this.emit("onCardReady", this.getTopCard());
+    this.emit("onCardReady", this.getCard());
   }
 
-  // get the current card (the one you can swipe right now)
-  getTopCard() {
+  // get current card
+  getCard() {
     if (this.currentIndex >= this.profiles.length) {
+      console.log("[CardStack] no more cards");
       return null;
     }
-    return this.profiles[this.currentIndex];
+    const card = this.profiles[this.currentIndex];
+    console.log(`[CardStack] getCard: ${card.id}`);
+    return card;
   }
 
-  // peek at the next card coming up (don't remove it)
-  getPeekCard() {
-    const nextIndex = this.currentIndex + 1;
-    if (nextIndex >= this.profiles.length) {
-      return null;
-    }
-    return this.profiles[nextIndex];
+  // next card exists?
+  hasNext() {
+    return this.currentIndex + 1 < this.profiles.length;
   }
 
-  // remove the current card and move to the next one
-  destroyCard(reason = "slash") {
-    const card = this.getTopCard();
-    
-    if (!card) {
-      console.warn("tried to destroy card but there isnt one");
-      return;
-    }
-
-    // clean up the visual card object if it exists
-    if (this.cardInstances.has(card.id)) {
-      const obj = this.cardInstances.get(card.id);
-      if (obj && !obj.isDestroyed) {
-        obj.destroy();
-      }
-      this.cardInstances.delete(card.id);
-    }
-
-    console.log(`removed card ${card.id} (${reason})`);
-    this.emit("onCardDestroyed", card, reason);
-
-    // move to next card
+  // destroy and move to next
+  destroyCard(reason) {
+    const card = this.getCard();
+    console.log(`[CardStack] destroy ${card?.id} (${reason})`);
     this.currentIndex += 1;
 
-    // tell scene what happened
-    if (this.hasCards()) {
-      this.emit("onCardReady", this.getTopCard());
+    if (this.hasNext()) {
+      console.log(`[CardStack] next card ready`);
+      this.emit("onCardReady", this.getCard());
     } else {
-      console.log("no more cards!");
+      console.log(`[CardStack] stack empty`);
       this.emit("onStackEmpty");
     }
-  }
-
-  // keep track of the actual card object in the scene
-  registerCardInstance(profileId, cardObject) {
-    this.cardInstances.set(profileId, cardObject);
-  }
-
-  // forget about a card object
-  unregisterCardInstance(profileId) {
-    this.cardInstances.delete(profileId);
-  }
-
-  // check if there are more cards
-  hasCards() {
-    return this.currentIndex < this.profiles.length;
-  }
-
-  // how many cards are left (including current)
-  getRemainingCount() {
-    return Math.max(0, this.profiles.length - this.currentIndex);
-  }
-
-  // reset everything for a restart
-  reset() {
-    this.cardInstances.forEach((card) => {
-      if (card && !card.isDestroyed) {
-        card.destroy();
-      }
-    });
-    this.cardInstances.clear();
-    this.currentIndex = 0;
-    console.log("card stack reset");
   }
 }

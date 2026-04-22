@@ -1,88 +1,46 @@
-// animationoverlay creates visual effects when cards are destroyed
-// slash = blood splatters, hack = green scan lines
+// simple effects - draw and fade
 
 export class AnimationOverlay {
   constructor(scene) {
     this.scene = scene;
+    console.log("[AnimationOverlay] created");
   }
 
-  // play blood splatter effect for slash
-  playSlashEffect(x, y, onComplete) {
-    // create a graphics object to draw on
+  // one method for both effects
+  playEffect(type, x, y, onDone) {
+    console.log(`[AnimationOverlay] playing ${type} effect`);
+    
     const graphics = this.scene.add.graphics();
-    graphics.setDepth(50); // on top of everything
+    graphics.setDepth(50);
 
-    // draw random blood splatters
-    const splatCount = 12;
-    for (let i = 0; i < splatCount; i++) {
-      // random position around the center
-      const offsetX = (Math.random() - 0.5) * 200;
-      const offsetY = (Math.random() - 0.5) * 200;
-
-      // random size
-      const size = Math.random() * 20 + 5;
-
-      // blood red color
-      graphics.fillStyle(0x8b0000, 1);
-      graphics.fillCircle(x + offsetX, y + offsetY, size);
-
-      // add a darker outline
-      graphics.lineStyle(1, 0x5a0000);
-      graphics.strokeCircle(x + offsetX, y + offsetY, size);
+    if (type === "slash") {
+      // draw blood circles
+      for (let i = 0; i < 10; i++) {
+        const ox = (Math.random() - 0.5) * 200;
+        const oy = (Math.random() - 0.5) * 200;
+        const size = Math.random() * 15 + 5;
+        graphics.fillStyle(0x8b0000, 1);
+        graphics.fillCircle(x + ox, y + oy, size);
+      }
+    } else if (type === "hack") {
+      // draw green lines
+      graphics.lineStyle(2, 0x00ff00, 0.3);
+      for (let yy = 0; yy < this.scene.cameras.main.height; yy += 10) {
+        graphics.lineBetween(0, yy, this.scene.cameras.main.width, yy);
+      }
     }
 
-    // fade out the effect
+    // fade out
     this.scene.tweens.add({
       targets: graphics,
       alpha: 0,
       duration: 600,
       ease: "Cubic.easeOut",
       onComplete: () => {
+        console.log(`[AnimationOverlay] ${type} effect done`);
         graphics.destroy();
-        if (onComplete) onComplete();
+        if (onDone) onDone();
       },
     });
-  }
-
-
-  // play scan line flicker effect for hack
-  playHackEffect(x, y, onComplete) {
-    // create graphics for scan lines
-    const graphics = this.scene.add.graphics();
-    graphics.setDepth(50);
-
-    // draw horizontal lines across the screen
-    graphics.lineStyle(2, 0x00ff00, 0.4); // green, semi-transparent
-
-    const screenWidth = this.scene.cameras.main.width;
-    const lineSpacing = 8;
-
-    for (let yPos = 0; yPos < this.scene.cameras.main.height; yPos += lineSpacing) {
-      graphics.lineBetween(0, yPos, screenWidth, yPos);
-    }
-
-    // flicker effect - opacity goes on/off
-    let flickerCount = 0;
-    const flickerInterval = this.scene.time.addTimer({
-      delay: 75,
-      callback: () => {
-        // toggle opacity
-        graphics.alpha = graphics.alpha === 0 ? 0.4 : 0;
-        flickerCount++;
-
-        // stop after 4 flickers
-        if (flickerCount >= 8) {
-          flickerInterval.remove();
-          graphics.destroy();
-          if (onComplete) onComplete();
-        }
-      },
-      repeat: 7,
-    });
-  }
-
-  // clean up (if needed)
-  destroy() {
-    // graphics are auto-destroyed after effects
   }
 }
