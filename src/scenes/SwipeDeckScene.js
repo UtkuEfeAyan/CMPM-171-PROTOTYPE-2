@@ -1,22 +1,24 @@
 import { SwipeCard } from "../objects/SwipeCard.js";
-import { CardStack } from "../systems/CardStack.js";
 import { InputController } from "../systems/InputController.js";
 import { AnimationOverlay } from "../systems/AnimationOverlay.js";
 import { ProfileLoader } from "../systems/ProfileLoader.js";
 import { SwipeFlowController } from "../systems/SwipeFlowController.js";
-import { SWIPE_DIRECTIONS, SWIPE_EVENTS } from "../constants/swipeConfig.js";
+import { CARD_CONFIG, LAYOUT_CONFIG, SWIPE_DIRECTIONS, SWIPE_EVENTS } from "../constants/swipeConfig.js";
 
 export class SwipeDeckScene extends Phaser.Scene {
   // setup scene-level references used across card lifecycle
   constructor() {
     super({ key: "SwipeDeck" });
-    this.cardStack = null;
     this.inputController = null;
     this.animationOverlay = null;
     this.profileLoader = null;
     this.flowController = null;
+    this.profiles = [];
+    this.currentIndex = 0;
     this.activeCard = null;
-    this.peekCard = null;
+    this.pendingCard = null;
+    this.bufferCard = null;
+    this.layout = null;
     this.isCardGrabbed = false;
   }
 
@@ -30,17 +32,17 @@ export class SwipeDeckScene extends Phaser.Scene {
   // create systems, events, and initial stack
   create() {
     // fail fast if profile data is empty or invalid
-    const profiles = this.profileLoader.getProfilesFromCache();
-    if (!profiles.length) return;
+    this.profiles = this.profileLoader.getProfilesFromCache();
+    if (!this.profiles.length) return;
     this.setupSystems();
     this.setupEvents();
-    this.cardStack.init(profiles);
-    this.profileLoader.loadRemainingProfiles(profiles);
+    this.layout = this.computeCardLayout();
+    this.buildInitialStack();
+    this.profileLoader.loadRemainingProfiles(this.profiles);
   }
 
   // wire up independent systems used by this scene
   setupSystems() {
-    this.cardStack = new CardStack();
     this.inputController = new InputController(this);
     this.animationOverlay = new AnimationOverlay(this);
     this.flowController = new SwipeFlowController(this, this.animationOverlay);
@@ -48,14 +50,13 @@ export class SwipeDeckScene extends Phaser.Scene {
 
   // subscribe to stack and input events
   setupEvents() {
-    // card stack drives when a new top card should appear
-    this.cardStack.on(SWIPE_EVENTS.CARD_READY, (profile) => this.renderCards(profile));
     // input sends drag deltas so top card follows pointer movement
     this.inputController.on(SWIPE_EVENTS.MOVE, ({ dragX, dragY }) => this.moveActiveCard(dragX, dragY));
     this.inputController.on(SWIPE_EVENTS.DRAG_START, () => this.handleDragStart());
     this.inputController.on(SWIPE_EVENTS.DRAG_END, () => this.handleDragEnd());
     // input also sends final swipe direction when gesture ends
     this.inputController.on(SWIPE_EVENTS.END, ({ direction }) => this.handleSwipe(direction));
+    this.scale.on("resize", () => this.handleResize());
   }
 
   // frame loop: apply smooth drag motion while card is grabbed
@@ -64,29 +65,86 @@ export class SwipeDeckScene extends Phaser.Scene {
     this.activeCard.stepTowardsTarget();
   }
 
-  // render top card and one preview card behind it
-  renderCards(profile) {
-    if (!profile) return;
-    // keep at most 2 cards alive: one active and one preview
-    this.removePeekCard();
-    this.promotePeekCard();
-    if (!this.activeCard) this.activeCard = this.createCard(profile);
-    const nextProfile = this.cardStack.profiles[this.cardStack.currentIndex + 1];
-    this.peekCard = nextProfile ? this.createBackCard(nextProfile) : null;
+  // compute card bounds from camera size and manual phone insets
+  computeCardLayout() {
+    const camera = this.cameras.main;
+    const insets = LAYOUT_CONFIG.frameInsets;
+    const innerWidth = (camera.width - insets.left - insets.right) * LAYOUT_CONFIG.frameFitScale;
+    const innerHeight = (camera.height - insets.top - insets.bottom) * LAYOUT_CONFIG.frameFitScale;
+    const cardHeight = innerHeight;
+    const cardWidth = Math.min(innerWidth, cardHeight * LAYOUT_CONFIG.cardMaxAspect);
+    return {
+      centerX: camera.width / 2,
+      centerY: camera.height / 2,
+      cardWidth,
+      cardHeight,
+      imageHeight: cardHeight * LAYOUT_CONFIG.imageRatio,
+      textHeight: cardHeight * LAYOUT_CONFIG.textRatio,
+    };
   }
 
-  // create the active card that can be dragged and swiped
-  createCard(profile) {
-    const card = SwipeCard.create(this, profile, this.cameras.main.width / 2, this.cameras.main.height / 2);
+  // prepare initial active, pending, and buffer slots
+  async buildInitialStack() {
+    this.activeCard = await this.createSlotCard(this.currentIndex, "active");
+    this.pendingCard = await this.createSlotCard(this.currentIndex + 1, "pending");
+    this.bufferCard = await this.createSlotCard(this.currentIndex + 2, "buffer");
+  }
+
+  // create a card only after its texture is guaranteed ready
+  async createSlotCard(profileIndex, slotType, shouldDrop = false) {
+    const profile = this.profiles[profileIndex];
+    if (!profile) return null;
+    await this.profileLoader.ensureTextureReady(profile);
+    const y = shouldDrop ? LAYOUT_CONFIG.bufferStartY : this.getSlotY(slotType);
+    const card = SwipeCard.create(this, profile, this.layout.centerX, y, this.layout);
+    if (slotType === "active") return this.styleActiveCard(card);
+    if (slotType === "pending") return this.stylePendingCard(card);
+    return this.styleBufferCard(card, shouldDrop);
+  }
+
+  // set active card visuals and interaction pose
+  styleActiveCard(card) {
     card.setTopCardStyle();
+    card.x = this.layout.centerX;
+    card.y = this.getSlotY("active");
     return card;
   }
 
-  // create the next card preview behind the active card
-  createBackCard(profile) {
-    const card = SwipeCard.create(this, profile, this.cameras.main.width / 2, this.cameras.main.height / 2);
+  // set pending card visuals behind active card
+  stylePendingCard(card) {
     card.setBackCardStyle();
+    card.setDepth(CARD_CONFIG.depthBack);
+    card.setScale(CARD_CONFIG.backScale);
+    card.x = this.layout.centerX;
+    card.y = this.getSlotY("pending");
     return card;
+  }
+
+  // set buffer card visuals and optional top drop-in tween
+  styleBufferCard(card, shouldDrop) {
+    card.setBackCardStyle();
+    card.setDepth(CARD_CONFIG.depthBuffer);
+    card.setScale(CARD_CONFIG.bufferScale);
+    card.x = this.layout.centerX;
+    const targetY = this.getSlotY("buffer");
+    if (!shouldDrop) {
+      card.y = targetY;
+      return card;
+    }
+    this.tweens.add({
+      targets: card,
+      y: targetY,
+      duration: LAYOUT_CONFIG.bufferDropTweenMs,
+      ease: "Back.easeOut",
+    });
+    return card;
+  }
+
+  // return y position for each stack slot
+  getSlotY(slotType) {
+    if (slotType === "active") return this.layout.centerY;
+    if (slotType === "pending") return this.layout.centerY + LAYOUT_CONFIG.pendingOffsetY;
+    return this.layout.centerY + LAYOUT_CONFIG.bufferOffsetY;
   }
 
   // forward drag target values into active card state
@@ -160,27 +218,53 @@ export class SwipeDeckScene extends Phaser.Scene {
 
   // destroy old card and ask stack for next profile
   advanceStack() {
-    // remove old top card, then ask stack to publish the next profile
     this.activeCard.destroy();
     this.activeCard = null;
     this.isCardGrabbed = false;
-    this.cardStack.consumeCurrentCard();
+    this.currentIndex += 1;
+    this.promoteCardStack();
+    this.spawnBufferCard();
     this.inputController.setEnabled(true);
   }
 
-  // promote preview card into active top slot
-  promotePeekCard() {
-    if (!this.peekCard) return;
-    this.activeCard = this.peekCard;
-    this.peekCard = null;
-    this.activeCard.setTopCardStyle();
+  // promote pending->active and buffer->pending after a swipe
+  promoteCardStack() {
+    this.activeCard = this.pendingCard;
+    this.pendingCard = this.bufferCard;
+    this.bufferCard = null;
+    if (this.activeCard) {
+      this.styleActiveCard(this.activeCard);
+    }
+    if (this.pendingCard) {
+      this.stylePendingCard(this.pendingCard);
+    }
   }
 
-  // remove stale preview card before creating a new one
-  removePeekCard() {
-    if (!this.peekCard) return;
-    if (this.peekCard === this.activeCard) return;
-    this.peekCard.destroy();
-    this.peekCard = null;
+  // create the next buffer card and drop it from top of screen
+  async spawnBufferCard() {
+    this.bufferCard = await this.createSlotCard(this.currentIndex + 2, "buffer", true);
+  }
+
+  // recompute bounds on resize and apply to current cards
+  handleResize() {
+    this.layout = this.computeCardLayout();
+    if (this.activeCard) {
+      this.activeCard.centerX = this.layout.centerX;
+      this.activeCard.centerY = this.layout.centerY;
+      this.activeCard.applyLayout(this.layout);
+      this.styleActiveCard(this.activeCard);
+    }
+    if (this.pendingCard) {
+      this.pendingCard.centerX = this.layout.centerX;
+      this.pendingCard.centerY = this.layout.centerY;
+      this.pendingCard.applyLayout(this.layout);
+      this.stylePendingCard(this.pendingCard);
+    }
+    if (this.bufferCard) {
+      this.bufferCard.centerX = this.layout.centerX;
+      this.bufferCard.centerY = this.layout.centerY;
+      this.bufferCard.applyLayout(this.layout);
+      this.styleBufferCard(this.bufferCard, false);
+    }
   }
 }

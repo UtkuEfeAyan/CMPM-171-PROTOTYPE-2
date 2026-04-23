@@ -5,16 +5,18 @@ export class ProfileLoader {
   // wrap profile data loading so scene stays focused on gameplay
   constructor(scene) {
     this.scene = scene;
+    this.textureWaiters = new Map();
+    this.scene.load.on("filecomplete", (key, type) => this.resolveTextureWaiters(key, type));
   }
 
   // queue json and first image for fast first interaction
   preloadProfiles() {
-    // load json first, then preload only first card for fast first interaction
+    // load json first, then preload first 3 cards for strict look-ahead startup
     this.scene.load.json(SCENE_CONFIG.profileJsonKey, SCENE_CONFIG.profileJsonPath);
     this.scene.load.once(`filecomplete-json-${SCENE_CONFIG.profileJsonKey}`, (_key, _type, data) => {
       const profiles = this.getValidProfiles(data?.profiles || []);
       if (!profiles.length) return;
-      SwipeCard.preload(this.scene, profiles[0]);
+      profiles.slice(0, 3).forEach((profile) => SwipeCard.preload(this.scene, profile));
     });
   }
 
@@ -37,6 +39,36 @@ export class ProfileLoader {
   startLoader() {
     if (this.scene.load.isLoading()) return;
     this.scene.load.start();
+  }
+
+  // ensure profile texture is loaded before card creation
+  ensureTextureReady(profile, onReady) {
+    const textureKey = `profile_${profile.id}`;
+    if (this.scene.textures.exists(textureKey)) {
+      onReady?.();
+      return Promise.resolve();
+    }
+
+    SwipeCard.preload(this.scene, profile);
+    const waitPromise = new Promise((resolve) => {
+      const waiters = this.textureWaiters.get(textureKey) || [];
+      waiters.push(() => {
+        onReady?.();
+        resolve();
+      });
+      this.textureWaiters.set(textureKey, waiters);
+    });
+    this.startLoader();
+    return waitPromise;
+  }
+
+  // release pending callbacks when a queued image finishes
+  resolveTextureWaiters(key, type) {
+    if (type !== "image") return;
+    const waiters = this.textureWaiters.get(key);
+    if (!waiters?.length) return;
+    waiters.forEach((run) => run());
+    this.textureWaiters.delete(key);
   }
 
   // keep only profiles that pass minimal contract checks

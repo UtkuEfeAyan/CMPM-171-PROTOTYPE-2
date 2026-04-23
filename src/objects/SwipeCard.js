@@ -2,17 +2,20 @@ import { CARD_CONFIG } from "../constants/swipeConfig.js";
 
 export class SwipeCard extends Phaser.GameObjects.Container {
   // build one swipe card container with image + title
-  constructor(scene, x, y, profile) {
+  constructor(scene, x, y, profile, layout) {
     super(scene, x, y);
     this.profile = profile;
+    this.layout = layout;
     this.centerX = x;
     this.centerY = y;
     this.textureKey = `profile_${profile.id}`;
     this.targetDragX = 0;
     this.targetDragY = 0;
+    this.panel = this.createTextPanel(scene);
     this.image = this.createCardImage(scene);
     this.title = this.createCardTitle(scene);
     // keep image and title in one container so drag/tween affects both
+    this.add(this.panel);
     this.add(this.image);
     this.add(this.title);
 
@@ -23,19 +26,47 @@ export class SwipeCard extends Phaser.GameObjects.Container {
   // create the profile image node for this card
   createCardImage(scene) {
     const image = scene.add.image(0, 0, this.textureKey);
-    image.setDisplaySize(CARD_CONFIG.width, CARD_CONFIG.height);
+    image.setDisplaySize(this.layout.cardWidth, this.layout.imageHeight);
+    image.setPosition(0, this.getImageCenterY());
     return image;
+  }
+
+  // create the bottom text background panel
+  createTextPanel(scene) {
+    return scene.add.rectangle(0, this.getTextCenterY(), this.layout.cardWidth, this.layout.textHeight, 0xd90910, 1);
   }
 
   // create the profile title text under the image
   createCardTitle(scene) {
-    const title = scene.add.text(0, CARD_CONFIG.textOffsetY, this.profile.name, {
-      fontSize: "24px",
+    const title = scene.add.text(0, this.getTextCenterY(), this.profile.text || this.profile.name, {
+      fontSize: "20px",
       color: "#fff",
       align: "center",
+      wordWrap: { width: this.layout.cardWidth * 0.88, useAdvancedWrap: true },
     });
     title.setOrigin(0.5, 0.5);
     return title;
+  }
+
+  // image should fill top 70 percent
+  getImageCenterY() {
+    return -this.layout.cardHeight / 2 + this.layout.imageHeight / 2;
+  }
+
+  // text should fill bottom 30 percent
+  getTextCenterY() {
+    return this.layout.cardHeight / 2 - this.layout.textHeight / 2;
+  }
+
+  // resize card regions when viewport or frame bounds change
+  applyLayout(layout) {
+    this.layout = layout;
+    this.image.setDisplaySize(this.layout.cardWidth, this.layout.imageHeight);
+    this.image.setPosition(0, this.getImageCenterY());
+    this.panel.setSize(this.layout.cardWidth, this.layout.textHeight);
+    this.panel.setPosition(0, this.getTextCenterY());
+    this.title.setPosition(0, this.getTextCenterY());
+    this.title.setWordWrapWidth(this.layout.cardWidth * 0.88, true);
   }
 
   // store the latest drag target from input
@@ -84,7 +115,7 @@ export class SwipeCard extends Phaser.GameObjects.Container {
   setBackCardStyle() {
     this.setScale(CARD_CONFIG.backScale);
     this.setDepth(CARD_CONFIG.depthBack);
-    this.y = this.centerY + CARD_CONFIG.backOffsetY;
+    this.y = this.centerY;
     this.alpha = 1;
   }
 
@@ -109,16 +140,16 @@ export class SwipeCard extends Phaser.GameObjects.Container {
   createCardPieces() {
     const leftPiece = this.scene.add.image(this.x, this.y, this.textureKey);
     const rightPiece = this.scene.add.image(this.x, this.y, this.textureKey);
-    this.preparePiece(leftPiece, 0, CARD_CONFIG.width / 2);
-    this.preparePiece(rightPiece, CARD_CONFIG.width / 2, CARD_CONFIG.width / 2);
+    this.preparePiece(leftPiece, 0, this.layout.cardWidth / 2);
+    this.preparePiece(rightPiece, this.layout.cardWidth / 2, this.layout.cardWidth / 2);
     return [leftPiece, rightPiece];
   }
 
   // crop one piece to a half of the original card
   preparePiece(piece, cropX, cropWidth) {
     // crop each cloned image so one becomes left half and one right half
-    piece.setDisplaySize(CARD_CONFIG.width, CARD_CONFIG.height);
-    piece.setCrop(cropX, 0, cropWidth, CARD_CONFIG.height);
+    piece.setDisplaySize(this.layout.cardWidth, this.layout.cardHeight);
+    piece.setCrop(cropX, 0, cropWidth, this.layout.cardHeight);
     piece.setDepth(CARD_CONFIG.depthTop + 2);
   }
 
@@ -170,7 +201,7 @@ export class SwipeCard extends Phaser.GameObjects.Container {
   }
 
   // helper factory so scene code stays tidy
-  static create(scene, profile, x, y) {
-    return new SwipeCard(scene, x, y, profile);
+  static create(scene, profile, x, y, layout) {
+    return new SwipeCard(scene, x, y, profile, layout);
   }
 }

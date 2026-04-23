@@ -34,13 +34,11 @@ export const SCENE_CONFIG = {
 
 // visual setup for front card, back card, and cut animation
 export const CARD_CONFIG = {
-  width: 320,
-  height: 480,
-  textOffsetY: 204,
   depthTop: 30,
   depthBack: 20,
-  backScale: 0.94,
-  backOffsetY: 20,
+  depthBuffer: 10,
+  backScale: 0.96,
+  bufferScale: 0.92,
   dragFollowY: 0.2,
   rotationDivisor: 150,
   maxRotation: 0.8,
@@ -53,6 +51,24 @@ export const CARD_CONFIG = {
   fragmentFallY: 140,
   fragmentRotate: 0.32,
   fragmentTweenMs: 280,
+};
+
+// phone frame and card area layout values
+export const LAYOUT_CONFIG = {
+  imageRatio: 0.7,
+  textRatio: 0.3,
+  frameInsets: {
+    top: 60,
+    right: 48,
+    bottom: 60,
+    left: 48,
+  },
+  frameFitScale: 1,
+  cardMaxAspect: 0.72,
+  pendingOffsetY: 14,
+  bufferOffsetY: 28,
+  bufferStartY: -260,
+  bufferDropTweenMs: 260,
 };
 
 // effect tuning for slash blood and hack binary rain
