@@ -1,216 +1,224 @@
-import { InputController } from "../systems/InputController.js";
-import { AnimationOverlay } from "../systems/AnimationOverlay.js";
-import { ProfileLoader } from "../systems/ProfileLoader.js";
-import { SwipeFlowController } from "../systems/SwipeFlowController.js";
-import { CardStackManager } from "../systems/CardStackManager.js";
-import { PersistenceManager } from "../systems/PersistenceManager.js";
-import { LAYOUT_CONFIG, SWIPE_DIRECTIONS, SWIPE_EVENTS } from "../constants/swipeConfig.js";
+import { ProfileCard } from "../objects/ProfileCard.js";
+import { SwipeLogic } from "../systems/InputManager.js";
+import { GameState } from "../systems/GameState.js";
+import { CARD_CONFIG, LAYOUT_CONFIG, SCENE_CONFIG } from "../constants/swipeConfig.js";
 
+// minimal scene: loads data, builds the active/pending stack, wires input.
+// all gameplay math lives in SwipeLogic; all render pieces live in ProfileCard;
+// all persistence lives in GameState. this scene only orchestrates.
 export class SwipeDeckScene extends Phaser.Scene {
-  // setup scene-level references used across card lifecycle
   constructor() {
     super({ key: "SwipeDeck" });
-    this.inputController = null;
-    this.animationOverlay = null;
-    this.profileLoader = null;
-    this.flowController = null;
-    this.stackManager = null;
-    this.profiles = [];
-    this.layout = null;
-    this.isCardGrabbed = false;
-    this.onResizeHandler = null;
-    this.onSceneShutdownHandler = null;
-    this.onSceneDestroyHandler = null;
+    this.profiles = []; // full deck loaded from profiles.json
+    this.currentIndex = 0; // data pointer for the active card
+    this.activeCard = null; // top card (user drags this one)
+    this.pendingCard = null; // next card (already on screen, behind active)
+    this.bounds = null; // current card size + screen center (rebuilt on resize)
+    this.logic = null; // SwipeLogic instance created after stack is ready
+    this.resizeHandler = null; // saved so we can cleanly detach on shutdown
   }
 
-  // preload profile json and first card texture
+  // preload profile metadata only.
+  // images are queued in create() once we know their paths.
   preload() {
-    // loader is a small helper so scene stays focused on gameplay flow
-    this.profileLoader = new ProfileLoader(this);
-    this.profileLoader.preloadProfiles();
+    this.load.json(SCENE_CONFIG.profileJsonKey, SCENE_CONFIG.profileJsonPath);
   }
 
-  // create systems, events, and initial stack
+  // create runs once the json is available. we then queue image loads
+  // for every profile and wait for them before building the stack.
+  // this guarantees no default texture flash on any card (no-pop).
   create() {
-    // fail fast if profile data is empty or invalid
-    this.profiles = this.profileLoader.getProfilesFromCache();
+    this.profiles = this.readProfiles();
     if (!this.profiles.length) return;
-    this.setupSystems();
-    this.setupEvents();
-    this.layout = this.computeCardLayout(); // snapshot layout for current viewport size
-    this.setupStackManager(); // inject scene services into stack lifecycle manager
-    this.initializeStack(); // async create active + pending + buffer cards
-    this.profileLoader.loadRemainingProfiles(this.profiles);
+
+    this.bounds = this.computeBounds();
+    this.queueProfileImages();
+    this.load.once("complete", () => this.startGameplay());
+    this.load.start();
+
+    // resize cleanup is wired early so we never leak listeners.
+    this.resizeHandler = () => this.handleResize();
+    this.scale.on("resize", this.resizeHandler);
+    this.events.once("shutdown", () => this.cleanup());
+    this.events.once("destroy", () => this.cleanup());
   }
 
-  // wire up independent systems used by this scene
-  setupSystems() {
-    this.inputController = new InputController(this);
-    this.animationOverlay = new AnimationOverlay(this);
-    this.flowController = new SwipeFlowController(this, this.animationOverlay);
+  // read and sanity-check profiles from cache.
+  // filters out any entry missing the fields a card needs to render.
+  readProfiles() {
+    const data = this.cache.json.get(SCENE_CONFIG.profileJsonKey);
+    const raw = data?.profiles ?? [];
+    return raw.filter((p) => p?.id != null && p?.name && p?.imagePath);
   }
 
-  /**
-   * create stack manager with shared dependencies and layout getter.
-   * inputs are scene services and current profile list.
-   * this keeps slot lifecycle logic outside scene methods.
-   */
-  setupStackManager() {
-    this.stackManager = new CardStackManager(this, this.profileLoader, this.profiles, () => this.layout);
+  // queue every profile image under a stable texture key.
+  // skips entries that are already cached so repeats are cheap.
+  queueProfileImages() {
+    this.profiles.forEach((profile) => {
+      const textureKey = `profile_${profile.id}`;
+      if (this.textures.exists(textureKey)) return;
+      this.load.image(textureKey, profile.imagePath);
+    });
   }
 
-  /**
-   * initialize active/pending/buffer slots asynchronously.
-   * input is none and output is prepared look-ahead stack.
-   * this guarantees first frame has ready card textures.
-   */
-  async initializeStack() {
-    await this.stackManager.initialize();
+  // once every texture is ready, build the stack and wire inputs.
+  // order matters: stack first (so logic has something to get), then inputs.
+  startGameplay() {
+    this.setupStack();
+    this.setupLogic();
+    this.setupInput();
   }
 
-  // subscribe to stack and input events
-  setupEvents() {
-    // input sends drag deltas so top card follows pointer movement
-    this.inputController.on(SWIPE_EVENTS.MOVE, ({ dragX, dragY }) => this.moveActiveCard(dragX, dragY));
-    this.inputController.on(SWIPE_EVENTS.DRAG_START, () => this.handleDragStart());
-    this.inputController.on(SWIPE_EVENTS.DRAG_END, () => this.handleDragEnd());
-    // input also sends final swipe direction when gesture ends
-    this.inputController.on(SWIPE_EVENTS.END, ({ direction }) => this.handleSwipe(direction));
-    this.onResizeHandler = () => this.handleResize();
-    this.scale.on("resize", this.onResizeHandler);
-    this.onSceneShutdownHandler = () => this.cleanupSceneListeners();
-    this.onSceneDestroyHandler = () => this.cleanupSceneListeners();
-    this.events.once("shutdown", this.onSceneShutdownHandler);
-    this.events.once("destroy", this.onSceneDestroyHandler);
-  }
-
-  // central cleanup so scene restarts do not leak listeners
-  cleanupSceneListeners() {
-    if (this.onResizeHandler) {
-      this.scale.off("resize", this.onResizeHandler);
-      this.onResizeHandler = null;
-    }
-    this.inputController?.destroy();
-    this.profileLoader?.destroy();
-  }
-
-  // frame loop: apply smooth drag motion while card is grabbed
-  update() {
-    if (!this.isCardGrabbed) return;
-    this.stackManager.stepActiveCard();
-  }
-
-  // compute card bounds from camera size and manual phone insets
-  computeCardLayout() {
+  // compute the card box and screen center from the current camera size.
+  // uses frameInsets as a manual "phone frame" so the card touches top+bottom.
+  computeBounds() {
     const camera = this.cameras.main;
-    const insets = LAYOUT_CONFIG.frameInsets; // manual phone-frame content padding
-    const innerWidth = (camera.width - insets.left - insets.right) * LAYOUT_CONFIG.frameFitScale; // usable width inside frame
-    const innerHeight = (camera.height - insets.top - insets.bottom) * LAYOUT_CONFIG.frameFitScale; // usable height inside frame
-    const cardHeight = innerHeight; // card touches top and bottom of usable frame area
-    const cardWidth = Math.min(innerWidth, cardHeight * LAYOUT_CONFIG.cardMaxAspect); // width clamped by frame width and aspect target
+    const insets = LAYOUT_CONFIG.frameInsets;
+    const innerWidth = camera.width - insets.left - insets.right;
+    const innerHeight = camera.height - insets.top - insets.bottom;
+    const height = innerHeight;
+    const width = Math.min(innerWidth, height * LAYOUT_CONFIG.cardMaxAspect);
     return {
+      width,
+      height,
       centerX: camera.width / 2,
       centerY: camera.height / 2,
-      cardWidth,
-      cardHeight,
-      imageHeight: cardHeight * LAYOUT_CONFIG.imageRatio,
-      textHeight: cardHeight * LAYOUT_CONFIG.textRatio,
     };
   }
 
-  // forward drag target values into active card state
-  moveActiveCard(dragX, dragY) {
-    this.stackManager.setActiveDragTarget(dragX, dragY);
+  // build the initial two-card stack: active on top, pending behind.
+  // having pending pre-created is the no-pop guarantee: when the active
+  // card leaves, pending is already visible and textured.
+  setupStack() {
+    this.currentIndex = 0;
+    this.activeCard = this.createCard(0);
+    this.pendingCard = this.createCard(1);
+    this.styleActive(this.activeCard);
+    this.stylePending(this.pendingCard);
   }
 
-  // apply visual grabbed state at drag start
-  handleDragStart() {
-    if (!this.stackManager.getActiveCard()) return;
-    this.isCardGrabbed = true;
-    this.stackManager.setActiveGrabbed(true);
+  // create one card for the given profile index, or null if index is past deck.
+  // centered inside bounds; final depth/scale are assigned by style* helpers.
+  createCard(profileIndex) {
+    if (profileIndex >= this.profiles.length) return null;
+    const profile = this.profiles[profileIndex];
+    return new ProfileCard(this, this.bounds.centerX, this.bounds.centerY, profile, this.bounds);
   }
 
-  // remove visual grabbed state when pointer releases
-  handleDragEnd() {
-    if (!this.stackManager.getActiveCard()) return;
-    this.isCardGrabbed = false;
-    this.stackManager.setActiveGrabbed(false);
+  // mark a card as the active/front card.
+  // only the active card is draggable and readable by SwipeLogic.
+  styleActive(card) {
+    if (!card) return;
+    card.setDepth(CARD_CONFIG.depthActive);
+    card.setScale(CARD_CONFIG.releaseScale);
+    card.setPosition(this.bounds.centerX, this.bounds.centerY);
+    card.centerX = this.bounds.centerX;
+    card.centerY = this.bounds.centerY;
+    card.alpha = 1;
+    card.angle = 0;
   }
 
-  // resolve final swipe direction into throw/snap behavior
-  handleSwipe(direction) {
-    const activeCard = this.stackManager.getActiveCard();
-    if (!activeCard) return;
-    this.isCardGrabbed = false;
-    this.stackManager.setActiveGrabbed(false);
-    // block new input until tween/effect chain completes
-    this.inputController.setEnabled(false);
-    this.flowController.resolveSwipe( // pass current top card to throw/snap resolver
-      direction,
-      activeCard,
-      () => this.handleSnapBackComplete(),
-      () => this.completeSwipe(direction)
+  // mark a card as the pending/back card.
+  // smaller scale + lower depth so the active card clearly sits on top.
+  stylePending(card) {
+    if (!card) return;
+    card.setDepth(CARD_CONFIG.depthPending);
+    card.setScale(CARD_CONFIG.pendingScale);
+    card.setPosition(this.bounds.centerX, this.bounds.centerY + LAYOUT_CONFIG.pendingOffsetY);
+    card.centerX = this.bounds.centerX;
+    card.centerY = this.bounds.centerY;
+    card.alpha = 1;
+    card.angle = 0;
+  }
+
+  // build the SwipeLogic state machine and hand it the stack adapter.
+  // the adapter exposes only the three hooks logic needs: get, promote, commit.
+  setupLogic() {
+    this.logic = new SwipeLogic(
+      this,
+      {
+        getActive: () => this.activeCard,
+        promote: () => this.promote(),
+        onHackCommit: (profileId) => this.onHackCommit(profileId),
+      },
+      { threshold: SCENE_CONFIG.swipeThreshold }
     );
   }
 
-  // after snapback, reset targets and re-enable input
-  handleSnapBackComplete() {
-    const activeCard = this.stackManager.getActiveCard();
-    if (!activeCard) return;
-    activeCard.resetDragTarget();
-    this.inputController.setEnabled(true);
+  // wire pointer + keyboard events to SwipeLogic methods.
+  // scene listens once; all state lives inside logic.
+  setupInput() {
+    this.input.on("pointerdown", (pointer) => this.logic.beginDrag(pointer));
+    this.input.on("pointermove", (pointer) => this.logic.handleMove(pointer));
+    this.input.on("pointerup", () => this.logic.handleRelease());
+    this.input.keyboard?.on("keydown", (event) => this.logic.handleKey(event));
   }
 
-  // route completed swipe to slash or hack path
-  completeSwipe(direction) {
-    if (!this.stackManager.getActiveCard()) return;
-    const isCardSlashed = direction === SWIPE_DIRECTIONS.SLASH;
-    if (isCardSlashed) return this.finishSlash();
-    this.finishHack();
+  // core no-pop promotion sequence.
+  // 1. destroy old active (it has already animated off or cut apart)
+  // 2. promote pending -> active (it's already textured and on screen)
+  // 3. create a fresh pending if profiles remain
+  // 4. drop the new pending from above for visual continuity
+  async promote() {
+    if (this.activeCard) this.activeCard.destroy();
+    this.activeCard = this.pendingCard;
+    this.currentIndex += 1;
+    this.styleActive(this.activeCard);
+
+    this.pendingCard = this.createCard(this.currentIndex + 1);
+    if (!this.pendingCard) return;
+    this.stylePending(this.pendingCard);
+    await this.dropInPending(this.pendingCard);
   }
 
-  // slash path plays split animation before stack advance
-  finishSlash() {
-    const activeCard = this.stackManager.getActiveCard();
-    if (!activeCard) return;
-    activeCard.playCutToPieces(() => this.advanceStack());
-  }
-
-  // hack path triggers handoff event then advances stack
-  finishHack() {
-    const activeProfile = this.stackManager.getActiveProfile();
-    if (!activeProfile) return;
-    this.onHackCommit(activeProfile); // write hacked id before leaving current card
-    this.routeToHackPath(activeProfile); // existing hook for minigame scene routing
-    this.advanceStack();
+  // drop the new pending card from above the screen to its rest slot.
+  // input: card to tween. output: promise that resolves when drop finishes.
+  dropInPending(card) {
+    card.y = LAYOUT_CONFIG.pendingDropStartY;
+    return new Promise((resolve) => {
+      this.tweens.add({
+        targets: card,
+        y: this.bounds.centerY + LAYOUT_CONFIG.pendingOffsetY,
+        duration: LAYOUT_CONFIG.pendingDropTweenMs,
+        ease: "Back.easeOut",
+        onComplete: resolve,
+      });
+    });
   }
 
   /**
-   * save hacked profile id into global runtime store.
-   * input is committed hacked profile object.
-   * this provides data for future hacked list scene.
+   * hook for hack commit: writes the id to the global GameState.
+   * input: profileId that was just hacked.
+   * also fires a window CustomEvent so future scenes/ui can react
+   * without importing GameState directly.
    */
-  onHackCommit(profile) {
-    PersistenceManager.addHackedCardID(profile.id);
-    window.dispatchEvent(new CustomEvent("hack-commit", { detail: { profile, hackedCardIDs: PersistenceManager.getHackedCardIDs() } }));
+  onHackCommit(profileId) {
+    GameState.recordHack(profileId);
+    window.dispatchEvent(
+      new CustomEvent("hack-commit", {
+        detail: { profileId, hackedIds: GameState.getHackedIDs() },
+      })
+    );
   }
 
-  // emit route event so external minigame flow can listen
-  routeToHackPath(profile) {
-    // this is the handoff point for the separate hack minigame scene
-    const targetSceneKey = profile?.targetSceneKey || "hack-minigame";
-    window.dispatchEvent(new CustomEvent("hack-route", { detail: { targetSceneKey, profile } }));
-  }
-
-  // destroy old card and ask stack for next profile
-  advanceStack() {
-    this.isCardGrabbed = false;
-    this.stackManager.commitResolvedCard().finally(() => this.inputController.setEnabled(true)); // unlock input after promotion and buffer spawn
-  }
-
-  // recompute bounds on resize and apply to current cards
+  // recompute bounds on window resize and reapply active/pending poses.
+  // cards remain the same instances; only their size + rest position change.
   handleResize() {
-    this.layout = this.computeCardLayout();
-    this.stackManager?.applyLayout();
+    if (!this.activeCard && !this.pendingCard) {
+      this.bounds = this.computeBounds();
+      return;
+    }
+    this.bounds = this.computeBounds();
+    this.styleActive(this.activeCard);
+    this.stylePending(this.pendingCard);
+  }
+
+  // detach anything we subscribed to on the scale manager.
+  // phaser owns input/keyboard listeners per-scene and clears them itself.
+  cleanup() {
+    if (this.resizeHandler) {
+      this.scale.off("resize", this.resizeHandler);
+      this.resizeHandler = null;
+    }
   }
 }

@@ -1,287 +1,166 @@
-import { CARD_CONFIG } from "../constants/swipeConfig.js";
+import { CARD_CONFIG, LAYOUT_CONFIG } from "../constants/swipeConfig.js";
 
+// one card in the swiper deck.
+// renders a 70/30 split (image on top, text on bottom) inside a phaser container
+// so every transform (drag, tilt, fade, split) affects the whole card as a unit.
 export class ProfileCard extends Phaser.GameObjects.Container {
   /**
-   * build one card container with image + text panel.
-   * input is scene position profile and layout object.
-   * this keeps render pieces grouped for easy motion/tween.
+   * build one card positioned at (x, y) using profile data and a bounds box.
+   * input: scene reference, home position, profile object, layout bounds.
+   * this constructor creates all visuals in one pass (initLayout) so the
+   * scene stays minimal and only calls new ProfileCard(...) per card.
    */
-  constructor(scene, x, y, profile, layout) {
+  constructor(scene, x, y, profile, bounds) {
     super(scene, x, y);
-    this.profile = profile; // full data object from profiles.json
-    this.layout = layout; // computed card size + split values from scene
-    this.centerX = x; // home x position for snap and lerp target math
-    this.centerY = y; // home y position for snap and lerp target math
-    this.textureKey = `profile_${profile.id}`; // texture cache key for this profile image
-    this.targetDragX = 0; // live drag offset on x axis from pointer input
-    this.targetDragY = 0; // live drag offset on y axis from pointer input
-    this.image = this.createCardImage(scene); // top 70 percent visual
-    this.textPanel = this.createTextPanel(scene); // bottom 30 percent color block
-    this.description = this.createDescription(scene); // wrapped text shown in panel
-    this.add(this.image);
-    this.add(this.textPanel);
-    this.add(this.description);
-    scene.add.existing(this); // register this container in phaser display list
-    this.setDepth(CARD_CONFIG.depthTop); // default as top card unless manager restyles it
+    this.id = profile.id; // expose id so logic layer can record hacks by id
+    this.profile = profile; // full profile data (name, text, targetSceneKey)
+    this.bounds = bounds; // { width, height } card size from scene layout
+    this.centerX = x; // rest x used by spring-back tween
+    this.centerY = y; // rest y used by spring-back tween
+    this.initLayout();
+    scene.add.existing(this);
   }
 
   /**
-   * create top image block for the 70 percent area.
-   * input is scene, output is image game object.
-   * this isolates card art sizing from scene code.
+   * create the 70/30 split visuals in a single method.
+   * input: nothing (reads this.bounds and this.profile).
+   * this keeps layout math in one place so resizes and tweaks are easy.
    */
-  createCardImage(scene) {
-    const image = scene.add.image(0, this.getImageCenterY(), this.textureKey);
-    image.setDisplaySize(this.layout.cardWidth, this.layout.imageHeight);
-    return image;
+  initLayout() {
+    const { width, height } = this.bounds;
+    const textureKey = `profile_${this.id}`;
+
+    // top 70%: profile photo, anchored at the upper-center of the card.
+    // y offset = -height*0.15 puts its center in the top 70% area.
+    this.image = this.scene.add
+      .image(0, -height * 0.15, textureKey)
+      .setDisplaySize(width, height * LAYOUT_CONFIG.imageRatio);
+
+    // bottom 30%: red text panel used as a solid contrast backdrop.
+    // centered at height*0.35 (midpoint of the bottom third).
+    this.textPanel = this.scene.add.rectangle(
+      0,
+      height * 0.35,
+      width,
+      height * LAYOUT_CONFIG.textRatio,
+      0xd90910,
+      1
+    );
+
+    // name line shown first in the panel.
+    this.nameText = this.scene.add
+      .text(0, height * 0.3, this.profile.name || "", {
+        fontSize: "22px",
+        color: "#ffffff",
+        fontStyle: "bold",
+      })
+      .setOrigin(0.5);
+
+    // description line wrapped to fit inside the panel width.
+    this.descText = this.scene.add
+      .text(0, height * 0.4, this.profile.text || "", {
+        fontSize: "14px",
+        color: "#ffffff",
+        align: "center",
+        wordWrap: { width: width * 0.88, useAdvancedWrap: true },
+      })
+      .setOrigin(0.5);
+
+    this.add([this.image, this.textPanel, this.nameText, this.descText]);
   }
 
   /**
-   * create bottom panel for text readability.
-   * input is scene, output is rectangle game object.
-   * this gives stable contrast regardless of profile art.
+   * unified tween helper that returns a promise.
+   * input: tween props, duration, ease. output: resolves when tween finishes.
+   * this is the ONLY animation entry point for the scene/logic layer,
+   * so every swipe/snap/throw uses the same predictable shape.
    */
-  createTextPanel(scene) {
-    return scene.add.rectangle(0, this.getTextCenterY(), this.layout.cardWidth, this.layout.textHeight, 0xd90910, 1);
-  }
-
-  /**
-   * create wrapped text description in bottom 30 percent.
-   * input is scene, output is text game object.
-   * this keeps profile info anchored and readable.
-   */
-  createDescription(scene) {
-    const description = scene.add.text(0, this.getTextCenterY(), this.profile.text || this.profile.name, {
-      fontSize: "20px",
-      color: "#fff",
-      align: "center",
-      wordWrap: { width: this.layout.cardWidth * 0.88, useAdvancedWrap: true },
+  animate(targetProps, duration = 300, ease = "Power2") {
+    return new Promise((resolve) => {
+      this.scene.tweens.add({
+        targets: this,
+        ...targetProps,
+        duration,
+        ease,
+        onComplete: resolve,
+      });
     });
-    description.setOrigin(0.5, 0.5);
-    return description;
   }
 
   /**
-   * compute y center for top image region.
-   * input is none, output is local y offset.
-   * this enforces 70/30 split from layout values.
-   */
-  getImageCenterY() {
-    return -this.layout.cardHeight / 2 + this.layout.imageHeight / 2;
-  }
-
-  /**
-   * compute y center for bottom text region.
-   * input is none, output is local y offset.
-   * this keeps text in the dedicated lower zone.
-   */
-  getTextCenterY() {
-    return this.layout.cardHeight / 2 - this.layout.textHeight / 2;
-  }
-
-  /**
-   * update card internals after resize/layout recalculation.
-   * input is new layout object, output is in-place updates.
-   * this avoids destroying and recreating cards on resize.
-   */
-  applyLayout(layout) {
-    this.layout = layout;
-    this.image.setPosition(0, this.getImageCenterY());
-    this.image.setDisplaySize(this.layout.cardWidth, this.layout.imageHeight);
-    this.textPanel.setPosition(0, this.getTextCenterY());
-    this.textPanel.setSize(this.layout.cardWidth, this.layout.textHeight);
-    this.description.setPosition(0, this.getTextCenterY());
-    this.description.setWordWrapWidth(this.layout.cardWidth * 0.88, true);
-  }
-
-  /**
-   * store latest drag target from pointer movement.
-   * input is drag offsets from start point.
-   * this decouples input frequency from render smoothing.
-   */
-  setDragTarget(dragX, dragY) {
-    this.targetDragX = dragX;
-    this.targetDragY = dragY;
-  }
-
-  /**
-   * run one lerp step toward target every frame.
-   * input is none, output is updated position + tilt.
-   * this is the main source of premium drag feel.
-   */
-  stepTowardsTarget() {
-    const nextX = this.centerX + this.targetDragX; // where x would be with direct mapping
-    const nextY = this.centerY + this.targetDragY * CARD_CONFIG.dragFollowY; // reduce vertical chase to keep swipe feel horizontal
-    this.x += (nextX - this.x) * CARD_CONFIG.dragSmoothness; // lerp x: current + delta * smoothness
-    this.y += (nextY - this.y) * CARD_CONFIG.dragSmoothness; // lerp y: same pattern with damped vertical follow
-    this.updateRotationAndAlpha();
-  }
-
-  /**
-   * map horizontal displacement into tilt and alpha.
-   * input is implicit current x relative to center.
-   * this gives quick visual feedback on swipe intent.
-   */
-  updateRotationAndAlpha() {
-    const dragDistanceX = this.x - this.centerX; // signed distance from center line
-    const mappedRotation = (dragDistanceX / CARD_CONFIG.rotationDivisor) * CARD_CONFIG.maxRotation; // convert distance into tilt amount
-    this.rotation = Phaser.Math.Clamp(mappedRotation, -CARD_CONFIG.maxRotation, CARD_CONFIG.maxRotation); // cap tilt so card never over-rotates
-    const mappedAlpha = 1.4 - Math.abs(dragDistanceX) / CARD_CONFIG.alphaRangePx; // fade card slightly as swipe commits
-    this.alpha = Phaser.Math.Clamp(mappedAlpha, CARD_CONFIG.minAlpha, 1); // keep alpha in safe visible range
-  }
-
-  /**
-   * animate grab feedback scale up/down.
-   * input is grabbed boolean, output is tweened scale.
-   * this helps players feel card pickup and release states.
+   * quick grab feedback: scales the card slightly up/down.
+   * input: boolean. output: tweened scale change.
+   * separated from animate() because it is a tiny juice effect, not a commit.
    */
   setGrabState(isGrabbed) {
-    const targetScale = isGrabbed ? CARD_CONFIG.grabScale : CARD_CONFIG.releaseScale;
     this.scene.tweens.killTweensOf(this);
-    this.scene.tweens.add({ targets: this, scale: targetScale, duration: 110, ease: "Sine.easeOut" });
-  }
-
-  /**
-   * clear drag target for spring reset path.
-   * input none, output zeroed drag target.
-   * this prevents stale drag vectors after release.
-   */
-  resetDragTarget() {
-    this.targetDragX = 0;
-    this.targetDragY = 0;
-  }
-
-  /**
-   * style card as active foreground card.
-   * input none, output active depth/scale pose.
-   * this marks the only interactable slot.
-   */
-  setTopCardStyle() {
-    this.setScale(CARD_CONFIG.releaseScale);
-    this.setDepth(CARD_CONFIG.depthTop);
-    this.y = this.centerY;
-    this.alpha = 1;
-    this.resetDragTarget();
-  }
-
-  /**
-   * style card as pending/background card.
-   * input none, output behind-card pose.
-   * this keeps next texture visible and ready.
-   */
-  setBackCardStyle() {
-    this.setScale(CARD_CONFIG.backScale);
-    this.setDepth(CARD_CONFIG.depthBack);
-    this.y = this.centerY;
-    this.alpha = 1;
-  }
-
-  /**
-   * play split animation used by slash resolve path.
-   * input is completion callback, output is visual cut.
-   * this separates slash feedback from scene logic.
-   */
-  playCutToPieces(onComplete) {
-    const [leftPiece, rightPiece] = this.createCardPieces();
-    this.alpha = 0;
-    this.animatePieces(leftPiece, rightPiece, onComplete);
-  }
-
-  /**
-   * create two temporary clones for split motion.
-   * input none, output two image halves.
-   * this preserves original art while animating fragments.
-   */
-  createCardPieces() {
-    const leftPiece = this.scene.add.image(this.x, this.y, this.textureKey);
-    const rightPiece = this.scene.add.image(this.x, this.y, this.textureKey);
-    this.preparePiece(leftPiece, 0, this.layout.cardWidth / 2);
-    this.preparePiece(rightPiece, this.layout.cardWidth / 2, this.layout.cardWidth / 2);
-    return [leftPiece, rightPiece];
-  }
-
-  /**
-   * crop one temporary piece to left/right half.
-   * input is piece plus crop values.
-   * this makes each fragment show only its side.
-   */
-  preparePiece(piece, cropX, cropWidth) {
-    piece.setDisplaySize(this.layout.cardWidth, this.layout.cardHeight);
-    piece.setCrop(cropX, 0, cropWidth, this.layout.cardHeight);
-    piece.setDepth(CARD_CONFIG.depthTop + 2);
-  }
-
-  /**
-   * run left and right fragment tweens together.
-   * input is both pieces and completion callback.
-   * this keeps slash timing compact and readable.
-   */
-  animatePieces(leftPiece, rightPiece, onComplete) {
-    this.animateLeftPiece(leftPiece);
-    this.animateRightPiece(rightPiece, onComplete);
-  }
-
-  /**
-   * animate left fragment out and fade.
-   * input is left piece, output destroy on complete.
-   * this creates directional cut motion to the left.
-   */
-  animateLeftPiece(leftPiece) {
+    const targetScale = isGrabbed ? CARD_CONFIG.grabScale : CARD_CONFIG.releaseScale;
     this.scene.tweens.add({
-      targets: leftPiece,
-      x: this.x - CARD_CONFIG.fragmentPushX,
-      y: this.y + CARD_CONFIG.fragmentFallY,
-      rotation: -CARD_CONFIG.fragmentRotate,
-      alpha: 0,
-      duration: CARD_CONFIG.fragmentTweenMs,
-      onComplete: () => leftPiece.destroy(),
+      targets: this,
+      scale: targetScale,
+      duration: 110,
+      ease: "Sine.easeOut",
     });
   }
 
   /**
-   * animate right fragment out and fade.
-   * input is right piece and completion callback.
-   * this completes the split and resumes game flow.
+   * slash animation: cuts the card texture into two halves that fly apart.
+   * input: none. output: promise that resolves when both halves finish.
+   * this is the slash "commit" visual, so logic can await it before promoting.
    */
-  animateRightPiece(rightPiece, onComplete) {
-    this.scene.tweens.add({
-      targets: rightPiece,
-      x: this.x + CARD_CONFIG.fragmentPushX,
-      y: this.y + CARD_CONFIG.fragmentFallY,
-      rotation: CARD_CONFIG.fragmentRotate,
-      alpha: 0,
-      duration: CARD_CONFIG.fragmentTweenMs,
-      onComplete: () => this.finishPieceCut(rightPiece, onComplete),
+  playSlashAnimation() {
+    return new Promise((resolve) => {
+      const [leftHalf, rightHalf] = this.createSlashHalves();
+      this.alpha = 0; // hide original card so halves are the only visible art
+
+      // left half flies left + down with negative rotation.
+      this.scene.tweens.add({
+        targets: leftHalf,
+        x: this.x - CARD_CONFIG.fragmentPushX,
+        y: this.y + CARD_CONFIG.fragmentFallY,
+        rotation: -CARD_CONFIG.fragmentRotate,
+        alpha: 0,
+        duration: CARD_CONFIG.fragmentTweenMs,
+        onComplete: () => leftHalf.destroy(),
+      });
+
+      // right half flies right + down with positive rotation.
+      // resolves the promise on the last tween so logic continues in order.
+      this.scene.tweens.add({
+        targets: rightHalf,
+        x: this.x + CARD_CONFIG.fragmentPushX,
+        y: this.y + CARD_CONFIG.fragmentFallY,
+        rotation: CARD_CONFIG.fragmentRotate,
+        alpha: 0,
+        duration: CARD_CONFIG.fragmentTweenMs,
+        onComplete: () => {
+          rightHalf.destroy();
+          resolve();
+        },
+      });
     });
   }
 
   /**
-   * cleanup final fragment and invoke continuation.
-   * input is right piece and callback.
-   * this keeps slash completion behavior centralized.
+   * helper: create two cropped image copies representing the card halves.
+   * input: none. output: [leftHalf, rightHalf] image game objects.
+   * separated so playSlashAnimation stays short and focused on tweens.
    */
-  finishPieceCut(rightPiece, onComplete) {
-    rightPiece.destroy();
-    onComplete?.();
-  }
+  createSlashHalves() {
+    const { width, height } = this.bounds;
+    const textureKey = `profile_${this.id}`;
+    const halfWidth = width / 2;
 
-  /**
-   * queue profile texture only if missing in cache.
-   * input is scene and profile data.
-   * this avoids duplicate loader work and race noise.
-   */
-  static preload(scene, profile) {
-    const textureKey = `profile_${profile.id}`;
-    if (scene.textures.exists(textureKey)) return;
-    scene.load.image(textureKey, profile.imagePath);
-  }
+    const leftHalf = this.scene.add.image(this.x, this.y, textureKey);
+    leftHalf.setDisplaySize(width, height);
+    leftHalf.setCrop(0, 0, halfWidth, height);
+    leftHalf.setDepth(this.depth + 2);
 
-  /**
-   * factory helper for consistent card creation signature.
-   * input is scene profile position and layout.
-   * this keeps scene and manager code short.
-   */
-  static create(scene, profile, x, y, layout) {
-    return new ProfileCard(scene, x, y, profile, layout);
+    const rightHalf = this.scene.add.image(this.x, this.y, textureKey);
+    rightHalf.setDisplaySize(width, height);
+    rightHalf.setCrop(halfWidth, 0, halfWidth, height);
+    rightHalf.setDepth(this.depth + 2);
+
+    return [leftHalf, rightHalf];
   }
 }
