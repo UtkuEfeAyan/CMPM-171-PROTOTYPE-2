@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<!-- keep meta simple so game fills phone + desktop cleanly -->
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+		<meta name="apple-mobile-web-app-capable" content="yes" />
+		<meta name="theme-color" content="#1c1511" />
+		<title>Phaser Swipe Profiles Prototype</title>
+		<link rel="stylesheet" href="style.css" />
+	</head>
+	<body>
+		<!-- phaser mounts canvas inside this root -->
+		<main class="app-shell">
+			<div id="game-root" aria-label="game canvas mount point"></div>
+		</main>
+		<!-- fallback text for users with js disabled -->
+		<noscript>this game needs javascript enabled</noscript>
+		<!-- engine first, then our module entry -->
+		<script src="lib/phaser.js"></script>
+		<script type="module" src="game.js"></script>
+	</body>
+</html>

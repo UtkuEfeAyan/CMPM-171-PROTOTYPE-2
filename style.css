@@ -1,0 +1,63 @@
+:root {
+  /* warm neutral background palette behind the game canvas */
+  --bg-top: #f6ecdf;
+  --bg-mid: #e4d0b3;
+  --bg-bottom: #cfae87;
+  --ink: #2a221d;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  /* lock page to viewport so browser scrolling does not fight gameplay */
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  touch-action: none;
+}
+
+body {
+  /* background is pure css so scene code can stay focused on gameplay logic */
+  font-family: "Trebuchet MS", Verdana, sans-serif;
+  color: var(--ink);
+  background:
+    radial-gradient(circle at 20% 16%, rgba(255, 255, 255, 0.65), transparent 36%),
+    radial-gradient(circle at 88% 80%, rgba(120, 61, 31, 0.18), transparent 42%),
+    linear-gradient(180deg, var(--bg-top) 0%, var(--bg-mid) 52%, var(--bg-bottom) 100%);
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
+    env(safe-area-inset-left);
+}
+
+.app-shell {
+  /* center the game root in a single predictable wrapper */
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+}
+
+#game-root {
+  /* phaser scales canvas to this full-screen host node */
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  touch-action: none;
+  overscroll-behavior: none;
+  -webkit-overflow-scrolling: auto;
+}
+
+canvas {
+  /* keep canvas crisp and prevent browser touch gestures from hijacking swipes */
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  touch-action: none;
+  image-rendering: auto;
+}
