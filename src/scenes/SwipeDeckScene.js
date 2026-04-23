@@ -18,6 +18,9 @@ export class SwipeDeckScene extends Phaser.Scene {
     this.profiles = [];
     this.layout = null;
     this.isCardGrabbed = false;
+    this.onResizeHandler = null;
+    this.onSceneShutdownHandler = null;
+    this.onSceneDestroyHandler = null;
   }
 
   // preload profile json and first card texture
@@ -73,7 +76,22 @@ export class SwipeDeckScene extends Phaser.Scene {
     this.inputController.on(SWIPE_EVENTS.DRAG_END, () => this.handleDragEnd());
     // input also sends final swipe direction when gesture ends
     this.inputController.on(SWIPE_EVENTS.END, ({ direction }) => this.handleSwipe(direction));
-    this.scale.on("resize", () => this.handleResize());
+    this.onResizeHandler = () => this.handleResize();
+    this.scale.on("resize", this.onResizeHandler);
+    this.onSceneShutdownHandler = () => this.cleanupSceneListeners();
+    this.onSceneDestroyHandler = () => this.cleanupSceneListeners();
+    this.events.once("shutdown", this.onSceneShutdownHandler);
+    this.events.once("destroy", this.onSceneDestroyHandler);
+  }
+
+  // central cleanup so scene restarts do not leak listeners
+  cleanupSceneListeners() {
+    if (this.onResizeHandler) {
+      this.scale.off("resize", this.onResizeHandler);
+      this.onResizeHandler = null;
+    }
+    this.inputController?.destroy();
+    this.profileLoader?.destroy();
   }
 
   // frame loop: apply smooth drag motion while card is grabbed
