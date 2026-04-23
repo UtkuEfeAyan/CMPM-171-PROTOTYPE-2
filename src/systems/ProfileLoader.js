@@ -6,7 +6,8 @@ export class ProfileLoader {
   constructor(scene) {
     this.scene = scene;
     this.textureWaiters = new Map(); // textureKey -> callbacks waiting for that exact image
-    this.scene.load.on("filecomplete", (key, type) => this.resolveTextureWaiters(key, type)); // wake waiters when phaser reports load complete
+    this.onFileComplete = (key, type) => this.resolveTextureWaiters(key, type);
+    this.scene.load.on("filecomplete", this.onFileComplete); // wake waiters when phaser reports load complete
   }
 
   // queue json and first image for fast first interaction
@@ -69,6 +70,12 @@ export class ProfileLoader {
     if (!waiters?.length) return;
     waiters.forEach((run) => run());
     this.textureWaiters.delete(key);
+  }
+
+  // detach loader listener and clear pending waiter callbacks
+  destroy() {
+    this.scene.load.off("filecomplete", this.onFileComplete);
+    this.textureWaiters.clear();
   }
 
   // keep only profiles that pass minimal contract checks
