@@ -1,10 +1,12 @@
+// src/systems/InputManager.js
+
 import { CARD_CONFIG, SCENE_CONFIG, SWIPE_DIRECTIONS } from "../constants/swipeConfig.js";
 
 // tiny enum for the swipe state machine.
 // using numbers keeps comparisons fast and intent obvious at call sites.
 export const States = Object.freeze({
-  IDLE: 0, // nothing happening, card at rest
-  DRAGGING: 1, // pointer is down and moving the active card
+  IDLE: 0,      // nothing happening, card at rest
+  DRAGGING: 1,  // pointer is down and moving the active card
   ANIMATING: 2, // a commit tween (or slash/snap) is running, input locked
 });
 
@@ -40,9 +42,7 @@ export class SwipeLogic {
 
   // developer-facing contract check for the stack adapter.
   // fails loudly with a clear message when wiring is wrong so bugs never
-  // slip silently into runtime. this is defensive programming: instead of
-  // a mystery "undefined is not a function" later, we get a named error
-  // right at construction.
+  // slip silently into runtime.
   assertStackShape(stack) {
     if (!stack || typeof stack !== "object") {
       throw new Error("[SwipeLogic] stack adapter is required");
@@ -58,7 +58,7 @@ export class SwipeLogic {
   // pointerdown entry: transition IDLE -> DRAGGING if a card exists.
   // input: phaser pointer. ignores input while animating to prevent collisions.
   beginDrag(pointer) {
-    if (this.state !== States.IDLE) return; // lock out during ANIMATING
+    if (this.state !== States.IDLE) return;
     const card = this.stack.getActive();
     if (!card) return;
     this.state = States.DRAGGING;
@@ -67,30 +67,22 @@ export class SwipeLogic {
   }
 
   // pointermove handler: lerps the active card toward the pointer.
-  // input: phaser pointer. only runs while DRAGGING.
-  // formula: new = current + (target - current) * lerp
-  // rotation and alpha are mapped from drag distance for visual feedback.
   handleMove(pointer) {
     if (this.state !== States.DRAGGING) return;
     const card = this.stack.getActive();
     if (!card) return;
 
-    // target is the card resting position offset by current pointer drag.
     const targetX = card.centerX + (pointer.x - this.dragStartPointerX);
     card.x += (targetX - card.x) * CARD_CONFIG.dragLerp;
 
-    // tilt in degrees as card moves left/right of its rest point.
     const dragOffsetX = card.x - card.centerX;
     card.angle = dragOffsetX / CARD_CONFIG.rotationDivisor;
 
-    // fade card slightly as it approaches the commit threshold.
     const mappedAlpha = 1.4 - Math.abs(dragOffsetX) / CARD_CONFIG.alphaFadeRange;
     card.alpha = Phaser.Math.Clamp(mappedAlpha, CARD_CONFIG.minAlpha, 1);
   }
 
   // pointerup entry: decides commit vs snap-back.
-  // input: none (reads the card's current offset).
-  // DRAGGING -> ANIMATING during tween; IDLE again once resolved.
   async handleRelease() {
     if (this.state !== States.DRAGGING) return;
     const card = this.stack.getActive();
@@ -100,37 +92,34 @@ export class SwipeLogic {
     }
 
     card.setGrabState(false);
-    this.state = States.ANIMATING; // lock input during resolution
+    this.state = States.ANIMATING;
 
     const dragOffsetX = card.x - card.centerX;
-    if (dragOffsetX > this.threshold) return this.executeCommit(SWIPE_DIRECTIONS.SLASH);
-    if (dragOffsetX < -this.threshold) return this.executeCommit(SWIPE_DIRECTIONS.HACK);
+    if (dragOffsetX > this.threshold) return this.executeCommit(SWIPE_DIRECTIONS.HACK);
+    if (dragOffsetX < -this.threshold) return this.executeCommit(SWIPE_DIRECTIONS.SLASH);
     await this.snapBack(card);
     this.state = States.IDLE;
   }
 
   // keyboard parity for desktop players.
-  // a = hack, d = slash. only fires from IDLE so typing mid-animation is ignored.
+  //   d = dragging right = HACK
+  //   a = dragging left  = SLASH
   handleKey(event) {
     if (this.state !== States.IDLE) return;
-    // bail early if the event does not carry a key (modifier-only events)
     if (!event.key) return;
     const key = event.key.toLowerCase();
     if (key !== "a" && key !== "d") return;
     this.state = States.ANIMATING;
-    // pick direction based on key: d means slash (right), a means hack (left)
     let direction;
     if (key === "d") {
-      direction = SWIPE_DIRECTIONS.SLASH;
-    } else {
       direction = SWIPE_DIRECTIONS.HACK;
+    } else {
+      direction = SWIPE_DIRECTIONS.SLASH;
     }
     this.executeCommit(direction);
   }
 
   // spring-back tween for a cancelled/short swipe.
-  // input: card to reset. output: promise that resolves when tween ends.
-  // keeps the card at rest pose (centerX/centerY, zero angle, full alpha).
   snapBack(card) {
     return card.animate(
       { x: card.centerX, y: card.centerY, angle: 0, alpha: 1 },
@@ -140,10 +129,8 @@ export class SwipeLogic {
   }
 
   // run the commit path for the given direction.
-  // input: "SLASH" or "HACK".
-  // SLASH plays the cut-in-half animation (stays in place, visual death).
-  // HACK records the id and throws the card off-screen left.
-  // both end with stack.promote() and returning state to IDLE.
+  // HACK  → throws card off-screen RIGHT, opens ProfileDetail.
+  // SLASH → cuts card in half with blood overlay (swipe left = reject).
   async executeCommit(direction) {
     const card = this.stack.getActive();
     if (!card) {
@@ -162,8 +149,12 @@ export class SwipeLogic {
       // slash plays the cut-in-half card animation AND the blood overlay together.
       // Promise.all keeps both visuals synchronized without extra state tracking.
       await Promise.all([card.playSlashAnimation(), slashOverlayPromise]);
+
+      await this.stack.promote();
+      this.state = States.IDLE;
+
     } else {
-      // notify the stack so gamestate can persist this hack, only if a hook was wired
+      // HACK: notify gamestate, throw card off-screen RIGHT, then navigate.
       if (typeof this.stack.onHackCommit === "function") {
         this.stack.onHackCommit(card.id);
       }
@@ -174,13 +165,14 @@ export class SwipeLogic {
       } else {
         hackOverlayPromise = Promise.resolve();
       }
-      // hack: throw card off-screen AND play the binary rain overlay together.
+      // throw card OFF-SCREEN TO THE RIGHT (positive x) since the player swiped right.
+      // throwHackX in config is negative (left exit); we negate it here for the right exit.
       await Promise.all([
         card.animate(
           {
-            x: card.centerX + SCENE_CONFIG.throwHackX,
+            x: card.centerX + Math.abs(SCENE_CONFIG.throwHackX), // exit right
             y: card.centerY - SCENE_CONFIG.throwRiseY,
-            angle: SCENE_CONFIG.throwHackAngle,
+            angle: -SCENE_CONFIG.throwHackAngle,                 // tilt mirrors too
             alpha: 0,
           },
           SCENE_CONFIG.throwTweenMs,
@@ -188,9 +180,18 @@ export class SwipeLogic {
         ),
         hackOverlayPromise,
       ]);
-    }
 
-    await this.stack.promote();
-    this.state = States.IDLE;
+      // fire navigation hook so SwipeDeckScene opens ProfileDetail.
+      // promote() is NOT called here — SwipeDeckScene.onSceneResume() does it
+      // after the user exits ProfileDetail, keeping deck state consistent.
+      if (typeof this.stack.onHackNavigate === "function") {
+        this.stack.onHackNavigate(card.id);
+        // state stays ANIMATING; SwipeDeckScene re-idles it on resume.
+      } else {
+        // fallback: no navigation wired, just advance the deck normally.
+        await this.stack.promote();
+        this.state = States.IDLE;
+      }
+    }
   }
 }

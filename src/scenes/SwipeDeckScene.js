@@ -85,7 +85,6 @@ export class SwipeDeckScene extends Phaser.Scene {
   // compute card size from the camera using percentages (Pillar 9).
   // responsive: works on phone portrait, desktop landscape, and vertical
   // monitor without editing a single pixel value.
-  //
   // width  = camera.width  * cardWidthPct  (clamped by min/max)
   // height = min(camera.height * cardHeightPct, width * aspectTall)
   computeBounds() {
@@ -214,13 +213,31 @@ export class SwipeDeckScene extends Phaser.Scene {
 
   // hack-commit hook. writes id into global GameState and fires a
   // window CustomEvent so other scenes/UI can subscribe without importing.
+  /**
+  * hook for hack commit: caches profile, records state, and navigates.
+  * input: profileId that was just hacked.
+  */
+  /**
+  * hook for hack commit: writes the id to the global GameState.
+  * input: profileId that was just hacked.
+  * also fires a window CustomEvent so future scenes/ui can react
+  * without importing GameState directly.
+  */
   onHackCommit(profileId) {
+    const profile = this.profiles.find(p => p.id === profileId);
+    if (profile) GameState.setLastHackedProfile(profile);
     GameState.recordHack(profileId);
+    
     window.dispatchEvent(
       new CustomEvent("hack-commit", {
         detail: { profileId, hackedIds: GameState.getHackedIDs() },
       })
     );
+
+    // FIXED: Launch detail scene WITHOUT pausing SwipeDeck.
+    // This prevents the async commit flow from freezing mid-animation.
+    // The detail panel covers the deck visually, so pausing is unnecessary.
+    this.scene.launch("ProfileDetail", { profile });
   }
 
   // reflow every live card for a new viewport.

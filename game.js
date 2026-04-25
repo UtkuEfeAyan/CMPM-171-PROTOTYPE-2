@@ -1,5 +1,6 @@
 import { TitleScreenScene } from "./src/scenes/TitleScreen.js";
 import { SwipeDeckScene } from "./src/scenes/SwipeDeckScene.js";
+import { ProfileDetailScene } from "./src/scenes/ProfileDetailScene.js";
 
 const { Phaser } = window;
 
@@ -19,7 +20,8 @@ const gameConfig = {
     windowEvents: true,
     touch: { capture: true },
   },
-  scene: [TitleScreenScene, SwipeDeckScene],
+  // ProfileDetailScene is added after SwipeDeckScene.
+  scene: [TitleScreenScene, SwipeDeckScene, ProfileDetailScene],
 };
 
 if (!Phaser) {

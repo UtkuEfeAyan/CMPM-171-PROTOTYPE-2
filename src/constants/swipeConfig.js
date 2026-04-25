@@ -140,3 +140,86 @@ export const LOADER_CONFIG = Object.freeze({
   initialBatchSize: 3, // how many profile images to load before first render
   backgroundDelayMs: 200, // delay before idle-time background loading begins
 });
+
+
+// DETAIL_LAYOUT: all spacing, sizing, and path values for the detail page.
+// DETAIL_STYLE:  all colors, fonts, and text styling for the detail page.
+// keeping these separate from the card/effect configs avoids merge conflicts
+// when tweaking the detail view independently of the swipe deck.
+
+export const DETAIL_LAYOUT = Object.freeze({
+  // panel dimensions: the page renders inside a fixed panel, not full-screen.
+  // panelWidthPct:  fraction of camera width the panel occupies.
+  // panelHeightPct: fraction of camera height the panel occupies.
+  // this gives the "phone screen within the game" look instead of full-bleed.
+  panelWidthPct:  0.88,
+  panelHeightPct: 0.88,
+
+  topPad:        20,
+  sectionGap:    10,
+  headerGap:     8,
+  infoRowHeight: 26,
+  bottomPad:     20,
+
+  profileImageHeight: 220,
+
+  // credit card asset sizing
+  // ccWidthRatio:   card width as a fraction of contentWidth.
+  // ccAspectRatio:  card height = cardW * ccAspectRatio.
+  ccWidthRatio:   0.85,
+  ccAspectRatio:  0.50,
+
+  // ssn card asset sizing
+  // ssnWidthRatio:  card width as a fraction of contentWidth.
+  // ssnAspectRatio: card height = cardW * ssnAspectRatio.
+  ssnWidthRatio:  0.88,
+  ssnAspectRatio: 0.60,
+
+  assetGap: 10,
+
+  buttonHeight: 48,
+
+  wheelScrollSpeed: 0.6,
+
+  creditCardImagePath: "assets/credit_card.png",
+  ssnImagePath:        "assets/ssn_card.png",
+
+  maxContentWidth: 480,
+});
+
+export const DETAIL_STYLE = Object.freeze({
+  // background
+  bgColor: 0x0a0a0a,
+
+  // panel frame
+  panelBgColor:     0x111111, // panel fill (slightly lighter than bg)
+  panelBorderColor: 0x00ff88, // green border matching the hack theme
+  panelBorderWidth: 2,
+
+  // profile image
+  imageFallbackColor: 0x2a2a2a, // dark gray placeholder when texture missing
+
+  // divider line between sections
+  dividerColor: 0x333333,
+
+  // name text (largest text on the page)
+  nameFontSize:  "30px",
+  nameColor:     "#ffffff",
+
+  // section headers ("GENERAL INFORMATION", "CREDIT CARD INFORMATION", etc.)
+  sectionHeaderFontSize:  "13px",
+  sectionHeaderColor:     "#00ff88", // green accent, matches hack theme
+
+  // key/value info rows
+  infoKeyFontSize: "13px",
+  infoKeyColor:    "#888888", // muted label
+  infoValFontSize: "13px",
+  infoValColor:    "#ffffff", // bright value
+
+  // action buttons
+  btnFontSize:  "14px",
+  btnTextColor: "#ffffff",
+
+  // shared font family across the whole scene
+  fontFamily: "Arial, sans-serif",
+});
