@@ -158,6 +158,7 @@ export class SwipeDeckScene extends Phaser.Scene {
         getActive: () => this.activeCard,
         promote: () => this.promote(),
         onHackCommit: (profileId) => this.onHackCommit(profileId),
+        onHackComplete: (profile) => this.launchHackMinigame(profile),
       },
       {
         threshold: SCENE_CONFIG.swipeThreshold,
@@ -221,6 +222,32 @@ export class SwipeDeckScene extends Phaser.Scene {
         detail: { profileId, hackedIds: GameState.getHackedIDs() },
       })
     );
+  }
+
+  // =====================================================================
+  // MINIGAME REDIRECT HOOK - EDIT THIS METHOD
+  // =====================================================================
+  // fires once after a successful hack swipe. by the time we get here:
+  //   - the hack tween (card thrown off-screen) has finished
+  //   - the binary-rain overlay has finished
+  //   - the next card has already dropped into place
+  //   - input is unlocked again (SwipeLogic state is back to IDLE)
+  //
+  // `profile` is the FULL profile object from profiles.json for the card
+  // that was just hacked, shaped like:
+  //   { id, name, text, imagePath }
+  //
+  // to redirect the player to your minigame scene:
+  //   1. add your scene class to the scene list in game.js
+  //   2. uncomment / write the scene.start call below
+  //
+  // example:
+  //   this.scene.start("YourMinigameKey", { profile });
+  //
+  // leave this method empty to stay on the swipe deck (default behavior).
+  // =====================================================================
+  launchHackMinigame(profile) {
+    // intentionally empty - fill in with your redirect / minigame launch.
   }
 
   // reflow every live card for a new viewport.

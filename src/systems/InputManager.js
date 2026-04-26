@@ -9,10 +9,13 @@ export const States = Object.freeze({
 });
 
 // swipe state machine + input handler, combined.
-// owns nothing visual: talks to a "stack" adapter with three callbacks:
-//   getActive() -> current top card (or null)
-//   promote() -> promise that resolves when the next card is active
-//   onHackCommit(id) -> fire and forget hook for gamestate saving
+// owns nothing visual: talks to a "stack" adapter with these callbacks:
+//   getActive() -> current top card (or null)                 [required]
+//   promote() -> promise that resolves when the next card is active  [required]
+//   onHackCommit(id) -> fire-and-forget hook for gamestate saving    [optional]
+//   onHackComplete(profile) -> post-animation redirect hook fired    [optional]
+//     once the hack tween finished AND the next card has dropped in.
+//     this is where teammates plug in minigame scene transitions.
 export class SwipeLogic {
   // construct the swipe logic around a scene + stack adapter.
   // input: scene (for tweens/camera), stack adapter, optional overrides.
@@ -151,6 +154,11 @@ export class SwipeLogic {
       return;
     }
 
+    // capture the profile up-front because once promote() runs the active
+    // card is destroyed and card.profile is no longer reachable. only the
+    // hack branch uses this, but it costs nothing to read it here.
+    const hackedProfile = card.profile;
+
     if (direction === SWIPE_DIRECTIONS.SLASH) {
       // play overlay only if effects subsystem is wired, otherwise use a no-op promise
       let slashOverlayPromise;
@@ -192,5 +200,15 @@ export class SwipeLogic {
 
     await this.stack.promote();
     this.state = States.IDLE;
+
+    // post-animation redirect hook. fires only on the hack branch and only
+    // when the scene wired it up. unlocking input first means the hook can
+    // safely scene.start() into a minigame OR do nothing and leave the
+    // player on the deck.
+    if (direction === SWIPE_DIRECTIONS.HACK) {
+      if (typeof this.stack.onHackComplete === "function") {
+        this.stack.onHackComplete(hackedProfile);
+      }
+    }
   }
 }
