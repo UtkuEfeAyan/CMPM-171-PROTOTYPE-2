@@ -288,20 +288,26 @@ export class StorageScene extends Phaser.Scene {
     this.gridContainer.y = next;
   }
 
-  // fires when the player clicks a portrait in the storage grid.
-  // starts ProfileDetail with the selected profile payload.
+  // ===== MINIGAME REDIRECT HOOK - EDIT THIS METHOD =====
+  // fires once when the player clicks a portrait in the storage grid.
+  // `profile` is the FULL profile object from profiles.json for the
+  // portrait that was clicked, shaped like:
+  //   { id, name, text, imagePath }
   //
-  // payload shape:
-  //   { profileId, profile, step: 1 }
+  // current behavior: log a debug line so teammates can confirm the click
+  // wired through the right profile while the real minigame scenes are
+  // still being built.
+  //
+  // to redirect to a per-profile minigame later:
+  //   1. add the minigame scene class to the scene list in game.js
+  //   2. dispatch on profile.id (or add a `targetSceneKey` field to
+  //      profiles.json and use that directly).
+  //
+  // example:
+  //   this.scene.start("YourMinigameKey", { profile });
   launchProfileMinigame(profile) {
     if (profile == null) return;
-    if (typeof profile !== "object") return;
-    const numericId = Number(profile.id);
-    if (!Number.isFinite(numericId)) return;
-
-    this.scene.start("ProfileDetail", {
-      profile,
-    });
+    console.log(`[DEBUG] Starting minigame for: ${profile.name}`);
   }
 
   // resize: rebuild header + grid x positions from new camera dimensions.

@@ -12,10 +12,13 @@ export const States = Object.freeze({
 // owns nothing visual: talks to a "stack" adapter with these callbacks:
 //   getActive() -> current top card (or null)                 [required]
 //   promote() -> promise that resolves when the next card is active  [required]
+
 //   onHackCommit(id) -> fire-and-forget hook for gamestate saving    [optional]
 //   onHackComplete(profile) -> post-animation redirect hook fired    [optional]
 //     once the hack tween finished AND the next card has dropped in.
 //     this is where teammates plug in minigame scene transitions.
+
+// Also onHackCommit -> ProfileDetailScene in SwipeDeckScene
 export class SwipeLogic {
   // construct the swipe logic around a scene + stack adapter.
   // input: scene (for tweens/camera), stack adapter, optional overrides.
@@ -145,8 +148,10 @@ export class SwipeLogic {
   // run the commit path for the given direction.
   // input: "SLASH" or "HACK".
   // SLASH plays the cut-in-half animation (stays in place, visual death).
-  // HACK records the id and throws the card off-screen left.
-  // both end with stack.promote() and returning state to IDLE.
+  // HACK records the id, throws the card off-screen left, plays binary rain,
+  //      then calls onHackAnimationComplete (if wired) BEFORE promoting so
+  //      the caller can launch ProfileDetailScene while SwipeDeck pauses.
+  //      After promote, calls onHackComplete for redirection
   async executeCommit(direction) {
     const card = this.stack.getActive();
     if (!card) {
@@ -154,9 +159,9 @@ export class SwipeLogic {
       return;
     }
 
+
     // capture the profile up-front because once promote() runs the active
-    // card is destroyed and card.profile is no longer reachable. only the
-    // hack branch uses this, but it costs nothing to read it here.
+    // card is destroyed and card.profile is no longer reachable.
     const hackedProfile = card.profile;
 
     if (direction === SWIPE_DIRECTIONS.SLASH) {
@@ -171,10 +176,12 @@ export class SwipeLogic {
       // Promise.all keeps both visuals synchronized without extra state tracking.
       await Promise.all([card.playSlashAnimation(), slashOverlayPromise]);
     } else {
-      // notify the stack so gamestate can persist this hack, only if a hook was wired
+      // notify the stack so gamestate can persist this hack, only if a hook was wired.
+      // pass full profile object so SwipeDeckScene can store it for the detail scene.
       if (typeof this.stack.onHackCommit === "function") {
-        this.stack.onHackCommit(card.id);
+        this.stack.onHackCommit(card.id, hackedProfile);
       }
+
       // play overlay only if effects subsystem is wired, otherwise use a no-op promise
       let hackOverlayPromise;
       if (this.effects) {
@@ -182,7 +189,9 @@ export class SwipeLogic {
       } else {
         hackOverlayPromise = Promise.resolve();
       }
-      // hack: throw card off-screen AND play the binary rain overlay together.
+
+      // throw card off-screen AND play the binary rain overlay together.
+      // both must finish before we notify the scene and promote the stack.
       await Promise.all([
         card.animate(
           {
@@ -196,15 +205,19 @@ export class SwipeLogic {
         ),
         hackOverlayPromise,
       ]);
+
+      // binary rain has finished — notify the scene so it can launch
+      // ProfileDetailScene BEFORE we promote (which resets the stack).
+      // the hook is optional so removing it can't break existing callers.
+      if (typeof this.stack.onHackAnimationComplete === "function") {
+        await this.stack.onHackAnimationComplete(hackedProfile);
+      }
     }
 
     await this.stack.promote();
     this.state = States.IDLE;
 
-    // post-animation redirect hook. fires only on the hack branch and only
-    // when the scene wired it up. unlocking input first means the hook can
-    // safely scene.start() into a minigame OR do nothing and leave the
-    // player on the deck.
+    // post-promote redirect hook
     if (direction === SWIPE_DIRECTIONS.HACK) {
       if (typeof this.stack.onHackComplete === "function") {
         this.stack.onHackComplete(hackedProfile);

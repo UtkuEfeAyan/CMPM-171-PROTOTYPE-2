@@ -1,35 +1,276 @@
 {
   "version": 2,
+  "version": 2,
   "profiles": [
     {
       "id": 1,
       "name": "Soldier",
-      "text": "",
-      "imagePath": "assets/profiles/Soilder Tinder.png"
+      "text": "I've seen some things... Looking for some fun after the war :0",
+      "imagePath": "assets/profiles/Soilder Tinder.png",
+      "photoPath": "assets/profiles/Photos/Soilder.png",
+      "info": {
+        "age": "41",
+        "occupation": "Fighting in da war",
+        "location": "The Trenches",
+        "height": "6'7",
+        "status": "Alive…somehow"
+      },
+      "creditCard": {
+        "number": "6767 6767 6767 6767",
+        "holder": "Soldier",
+        "expiry": "06/70",
+        "cvv": "067",
+        "bank": "Bank of War",
+        "type": "Visa"
+      },
+      "ssn": {
+        "number": "677-67-6767",
+        "issued": "67/67/6767",
+        "state": "Trenches"
+      }
     },
     {
       "id": 2,
-      "name": "Altice",
-      "text": "",
-      "imagePath": "assets/profiles/Altice Tinder.png"
+      "name": "Nayanika",
+      "text": "Life is a gamble. Send me money!!",
+      "imagePath": "assets/profiles/Nayanika Tinder.png",
+      "photoPath": "assets/profiles/Photos/Nayanika.png",
+      "info": {
+        "age": "20",
+        "occupation": "Lip Gloss Tester",
+        "location": "The Lip Gloss Labs",
+        "height": "8'88",
+        "status": "10 Lip Glosses in"
+      },
+      "creditCard": {
+        "number": "8888 8888 8888 8888",
+        "holder": "Nayanika",
+        "expiry": "88/88",
+        "cvv": "888",
+        "bank": "Lip Gloss Credit Union",
+        "type": "Visa"
+      },
+      "ssn": {
+        "number": "888-88-8888",
+        "issued": "88/88/8888",
+        "state": "Lip Gloss Lab"
+      }
     },
     {
       "id": 3,
       "name": "Efe",
-      "text": "",
-      "imagePath": "assets/profiles/Efe Tinder.png"
+      "text": "Cat dad, S.T.A.L.K.E.R enthusiast, game design nerd!",
+      "imagePath": "assets/profiles/Efe Tinder.png",
+      "photoPath": "assets/profiles/Photos/Efe.jpg",
+      "info": {
+        "age": "21",
+        "occupation": "Full-Time Cat Dad",
+        "location": "Home with his cats",
+        "height": "3'7",
+        "status": "I can't climb"
+      },
+      "creditCard": {
+        "number": "3737 3737 3737 3737",
+        "holder": "Efe",
+        "expiry": "37/37",
+        "cvv": "373",
+        "bank": "Shadow",
+        "type": "Visa"
+      },
+      "ssn": {
+        "number": "373-37-3737",
+        "issued": "37/37/3737",
+        "state": "Shadow Nation"
+      }
     },
     {
       "id": 4,
-      "name": "Melissa",
-      "text": "",
-      "imagePath": "assets/profiles/Melissa Tinder.png"
+      "name": "Altice",
+      "text": "Teaching Professor, Computational Media, I loveeeee Marvel Snap",
+      "imagePath": "assets/profiles/Altice Tinder.png",
+      "photoPath": "assets/profiles/Photos/Altice.png",
+      "info": {
+        "age": "25",
+        "occupation": "Professional Marvel Snap Player",
+        "location": "In front of my iPhone, playing Marvel Snap",
+        "height": "8",
+        "status": "Marvel Snap :0"
+      },
+      "creditCard": {
+        "number": "8888 8888 8888 8888",
+        "holder": "Nathan",
+        "expiry": "88/88",
+        "cvv": "888",
+        "bank": "Snap",
+        "type": "Visa"
+      },
+      "ssn": {
+        "number": "888-88-8888",
+        "issued": "88/88/8888",
+        "state": "Marvel Snap Nation"
+      }
     },
     {
       "id": 5,
-      "name": "Nayanika",
-      "text": "",
-      "imagePath": "assets/profiles/Nayanika Tinder.png"
+      "name": "Melissa",
+      "text": "Horse enthusiast, gatcha enjoyer, I play too much league -_-",
+      "imagePath": "assets/profiles/Melissa Tinder.png",
+      "photoPath": "assets/profiles/Photos/Melissa.png",
+      "info": {
+        "age": "21",
+        "occupation": "Gambler",
+        "location": "The Casinos",
+        "height": "2'1",
+        "status": "Hitting the casinos on a horse"
+      },
+      "creditCard": {
+        "number": "2121 2121 2121 2121",
+        "holder": "Melissa",
+        "expiry": "21/21",
+        "cvv": "212",
+        "bank": "Broke",
+        "type": "Visa"
+      },
+      "ssn": {
+        "number": "212-21-2121",
+        "issued": "21/21/2121",
+        "state": "CASINOOOOOOOOo"
+      }
+    },
+    {
+      "id": 6,
+      "name": "Charles",
+      "text": "Clash of Clans, Clash of Clans, Clash of Clans, ROYALLLLLLLLLLLEEEE",
+      "imagePath": "assets/profiles/Charles Tinder.png",
+      "photoPath": "assets/profiles/Photos/Charles.jpg",
+      "info": {
+        "age": "21",
+        "occupation": "The King Obviously",
+        "location": "In a duel",
+        "height": "1'1",
+        "status": "Winning"
+      },
+      "creditCard": {
+        "number": "1111 1111 1111 1111",
+        "holder": "Charles",
+        "expiry": "11/11",
+        "cvv": "111",
+        "bank": "Royale Bank",
+        "type": "Visa"
+      },
+      "ssn": {
+        "number": "111-11-1111",
+        "issued": "11/11/1111",
+        "state": "Clash of Clans Nation"
+      }
+    },
+    {
+      "id": 7,
+      "name": "Biker",
+      "text": "I like to ride, bike enthusiast, likes to see the sights",
+      "imagePath": "assets/profiles/Motercycle Tinder.png",
+      "photoPath": "assets/profiles/Photos/Biker.jpg",
+      "info": {
+        "age": "21",
+        "occupation": "Biker",
+        "location": "On the road",
+        "height": "4'4",
+        "status": "Riding"
+      },
+      "creditCard": {
+        "number": "4444 4444 4444 4444",
+        "holder": "Biker",
+        "expiry": "44/44",
+        "cvv": "444",
+        "bank": "Twin Air",
+        "type": "Visa"
+      },
+      "ssn": {
+        "number": "444-44-4444",
+        "issued": "44/44/4444",
+        "state": "Merica"
+      }
+    },
+    {
+      "id": 8,
+      "name": "Jared",
+      "text": "I can pose just like a mannequin. See, we look the same!!",
+      "imagePath": "assets/profiles/TA Tinder.png",
+      "photoPath": "assets/profiles/Photos/TA.jpg",
+      "info": {
+        "age": "25",
+        "occupation": "Standing Still",
+        "location": "In front of the mannequin store",
+        "height": "5'6",
+        "status": "Hasn’t moved in 3 days"
+      },
+      "creditCard": {
+        "number": "5656 5656 5656 5656",
+        "holder": "Jared",
+        "expiry": "56/56",
+        "cvv": "565",
+        "bank": "Appparel",
+        "type": "Visa"
+      },
+      "ssn": {
+        "number": "565-56-5656",
+        "issued": "56/56/5656",
+        "state": "Merica"
+      }
+    },
+    {
+      "id": 9,
+      "name": "Hike",
+      "text": "D1 Hiker, no one loves trees more than me!!!!",
+      "imagePath": "assets/profiles/D1 Hiker Tinder.png",
+      "photoPath": "assets/profiles/Photos/Hiker.jpg",
+      "info": {
+        "age": "26",
+        "occupation": "Hiking Duh",
+        "location": "The Woods",
+        "height": "9'0",
+        "status": "Amongst Trees"
+      },
+      "creditCard": {
+        "number": "9999 9999 9999 9999",
+        "holder": "Hike",
+        "expiry": "99/99",
+        "cvv": "999",
+        "bank": "Tree Bank",
+        "type": "Visa"
+      },
+      "ssn": {
+        "number": "999-99-9999",
+        "issued": "99/99/9999",
+        "state": "Merica"
+      }
+    },
+    {
+      "id": 10,
+      "name": "Annette",
+      "text": "“tall glass of water.” I enjoy long walks on the beach ",
+      "imagePath": "assets/profiles/Annette Tinder.png",
+      "photoPath": "assets/profiles/Photos/Annette.jpg",
+      "info": {
+        "age": "22",
+        "occupation": "Beach Walker",
+        "location": "The Beach",
+        "height": "5'11",
+        "status": "Amongst Trees"
+      },
+      "creditCard": {
+        "number": "2222 2222 2222 2222",
+        "holder": "Annette",
+        "expiry": "22/22",
+        "cvv": "222",
+        "bank": "Sand Bank",
+        "type": "Visa"
+      },
+      "ssn": {
+        "number": "222-22-2222",
+        "issued": "22/22/2222",
+        "state": "Atlantic Ocean"
+      }
     }
   ]
 }
