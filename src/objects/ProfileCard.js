@@ -87,15 +87,13 @@ export class ProfileCard extends Phaser.GameObjects.Container {
   }
 
   // build the card image (full bounds, centered at 0,0 inside the container).
-  // scaled slightly larger than bounds so any baked-in white border bleeds
-  // off the card edges and becomes invisible.
   // if the texture is missing we fall back to a colored rectangle so the
   // card is never a broken white box.
   buildImage(width, height) {
     const textureKey = this.textureKey();
     if (this.scene.textures.exists(textureKey)) {
       const image = this.scene.add.image(0, 0, textureKey);
-      image.setDisplaySize(width * 1.08, height * 1.001);
+      image.setDisplaySize(width, height);
       return image;
     }
     return this.scene.add.rectangle(0, 0, width, height, CARD_STYLE.fallbackPanelColor, 1);
@@ -111,7 +109,7 @@ export class ProfileCard extends Phaser.GameObjects.Container {
 
     if (this.image.setDisplaySize) {
       this.image.setPosition(0, 0);
-      this.image.setDisplaySize(width * 1.08, height * 1.08); // bleeds border off edges
+      this.image.setDisplaySize(width, height);
     } else {
       this.image.setPosition(0, 0);
       this.image.setSize(width, height);
@@ -137,6 +135,7 @@ export class ProfileCard extends Phaser.GameObjects.Container {
   // kills any existing scale tween so repeated grabs don't pile up.
   setGrabState(isGrabbed) {
     this.scene.tweens.killTweensOf(this);
+    // pick scale based on grab state: puff up on grab, return to rest on release
     let targetScale;
     if (isGrabbed) {
       targetScale = CARD_CONFIG.grabScale;
