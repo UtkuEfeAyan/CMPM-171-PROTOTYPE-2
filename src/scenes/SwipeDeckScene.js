@@ -5,7 +5,7 @@ import { ProfileLoader } from "../systems/ProfileLoader.js";
 import { PersistenceManager } from "../systems/PersistenceManager.js";
 import { GameState } from "../systems/GameState.js";
 import { BACKGROUND_CONFIG, CARD_CONFIG, LAYOUT_CONFIG, LOADER_CONFIG, SCENE_CONFIG } from "../constants/swipeConfig.js";
-
+import { StalkingScene } from "./StalkingScene.js";
 // orchestrator scene. every piece of real gameplay logic lives in other
 // modules - this scene just wires them together and owns deck pointers.
 //
@@ -62,6 +62,10 @@ export class SwipeDeckScene extends Phaser.Scene {
     this.bounds = this.computeBounds();
     this.bindSceneLifecycle();
     this.beginProgressiveLoad();
+    this.stalkKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.E);
+    this.input.keyboard.on("keydown-E", () => {
+      this.scene.start("stalkingScene");
+    });
   }
 
   // phone background, sits behind every gameplay element.
