@@ -23,10 +23,7 @@ const gameConfig = {
     windowEvents: true,
     touch: { capture: true },
   },
-  // ProfileDetailScene: launched as overlay by SwipeDeckScene after a HACK commit.
-  // StorageScene: launched by SwipeDeckScene when the Collection button is pressed.
-  // GearPuzzleScene: launched when the deck is exhausted (all cards swiped).
-  scene: [TitleScreenScene, SwipeDeckScene, GearPuzzleScene, StorageScene, ProfileDetailScene, StalkingScene],
+  scene: [TitleScreenScene, SwipeDeckScene, StorageScene, GearPuzzleScene, ProfileDetailScene],
 };
 
 if (!Phaser) {

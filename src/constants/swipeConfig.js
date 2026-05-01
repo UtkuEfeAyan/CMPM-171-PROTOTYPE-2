@@ -45,8 +45,6 @@ export const CARD_CONFIG = Object.freeze({
 
 // per-card visual styling. with text baked into the PNG, this is now just
 // the grab tween + fallback color used when a texture hasn't loaded yet.
-// per-card visual styling. with text baked into the PNG, this is now just
-// the grab tween + fallback color used when a texture hasn't loaded yet.
 export const CARD_STYLE = Object.freeze({
   grabTweenMs: 110, // grab/release scale tween duration
   grabEase: "Sine.easeOut", // easing for the grab puff
@@ -109,18 +107,10 @@ export const EFFECT_STYLE = Object.freeze({
 // card size is derived from the DISPLAYED phone background (after fit-scaling),
 // not the raw camera. percentages match BACKGROUND_CONFIG.innerScreen* so the
 // card fully fills the phone's inner screen rectangle.
-// card size is derived from the DISPLAYED phone background (after fit-scaling),
-// not the raw camera. percentages match BACKGROUND_CONFIG.innerScreen* so the
-// card fully fills the phone's inner screen rectangle.
 export const LAYOUT_CONFIG = Object.freeze({
   cardWidthPct: 1.001, // card width as fraction of bg display width (matches inner screen)
   cardHeightPct: 1.001, // card height as fraction of bg display height (matches inner screen)
-  cardAspectTall: 2.7, // loose enough that aspect never clamps fill height
-  cardMinWidth: 160, // never render cards narrower than this
-  cardMaxWidth: 700, // never render cards wider than this (clamps only on huge monitors)
-  cardWidthPct: 1.001, // card width as fraction of bg display width (matches inner screen)
-  cardHeightPct: 1.001, // card height as fraction of bg display height (matches inner screen)
-  cardAspectTall: 2.7, // loose enough that aspect never clamps fill height
+  cardAspectTall: 2.4, // loose enough that aspect never clamps fill height
   cardMinWidth: 160, // never render cards narrower than this
   cardMaxWidth: 700, // never render cards wider than this (clamps only on huge monitors)
   pendingOffsetY: 14, // pending card sits this far below active
@@ -136,25 +126,18 @@ export const LOADER_CONFIG = Object.freeze({
   backgroundDelayMs: 200, // delay before idle-time background loading begins
 });
 
-// title screen background — the blurred phone image shown before the user taps in.
-// kept separate from BACKGROUND_CONFIG so TitleScreen never touches Phone-II.
-export const TITLE_BG_CONFIG = Object.freeze({
-  textureKey: "phoneBg",
-  imagePath:  "assets/HackNSlashTitle.png",
-});
-
-// shared phone-frame background asset (used by SwipeDeckScene + StorageScene only).
+// shared phone-frame background asset (used by SwipeDeckScene + StorageScene).
 // the innerScreen* ratios describe the visible "screen" rectangle INSIDE the
 // phone art (the dark green window between the bezels). values are fractions
 // of the displayed bg size after fit-scaling. tweak these if you ship a new
 // bg PNG with a different inner-screen window.
 export const BACKGROUND_CONFIG = Object.freeze({
-  phoneTextureKey: "phoneBgII",
-  phoneImagePath: "assets/profiles/Phone.png",
+  phoneTextureKey: "phoneBg", // phaser cache key for the blurred phone background
+  phoneImagePath: "assets/PhoneBackgroundBlurred.png",
   depth: -10, // sit behind every gameplay element
   innerScreenWidthPct: 0.74, // inner phone screen width as fraction of bg display width
   innerScreenHeightPct: 0.74, // inner phone screen height as fraction of bg display height
-  innerScreenCenterYOffsetPct: 0.001, // bg center sits slightly above screen center
+  innerScreenCenterYOffsetPct: 0.001, // bg center sits slightly below screen center (home button strip)
 });
 
 // storage scene grid + scroll tuning.
@@ -170,62 +153,48 @@ export const STORAGE_CONFIG = Object.freeze({
   wheelStep: 0.6, // pixels of grid shift per wheel-delta unit
 });
 
-
-// All visual styling for ProfileDetailScene lives here so tuning is one-file.
-// Separated from the card constants above to keep each section self-contained.
-
-// colors, fonts, and text sizing for the detail panel.
-// aesthetic: hacker terminal / government dossier — green-on-black throughout.
-export const DETAIL_STYLE = Object.freeze({
-  bgColor:               0x000000,  // pure black fullscreen backdrop
-  panelBgColor:          0x050d08,  // very dark green-tinted panel fill
-  panelBorderColor:      0x00ff88,  // bright green accent border
-  panelBorderWidth:      2,         // border stroke thickness in px
-
-  fontFamily:            "Courier New, monospace", // monospace throughout — hacked accent
-
-  nameFontSize:          "26px",
-  nameColor:             "#00ff88", // green name text
-
-  sectionHeaderFontSize: "16px",
-  sectionHeaderColor:    "#eaff00", // dimmer green for section labels
-
-  infoKeyFontSize:       "15px",
-  infoKeyColor:          "#00cc66", // bright green for key labels
-  infoValFontSize:       "15px",
-  infoValColor:          "#aaffcc", // lighter green for values
-
-  dividerColor:          0x00ff88,  // green separator line
-
-  imageFallbackColor:    0x001a0a,  // very dark green when profile texture is missing
-
-  btnFontSize:           "14px",
-  btnTextColor:          "#ffffff",
+// title screen background asset config.
+export const TITLE_BG_CONFIG = Object.freeze({
+  textureKey: "titleBg",
+  imagePath: "assets/TitleScreenBlurred.png",
 });
 
-// layout geometry and spacing for the detail panel.
+// profile detail scene layout proportions and spacing.
 export const DETAIL_LAYOUT = Object.freeze({
-  panelWidthPct:       0.92,   // panel width as fraction of camera width
-  panelHeightPct:      0.88,   // panel height as fraction of camera height
-  maxContentWidth:     520,    // max content width in px (caps wide-screen stretch)
+  panelWidthPct: 0.78,
+  panelHeightPct: 0.88,
+  maxContentWidth: 560,
+  topPad: 24,
+  bottomPad: 18,
+  sectionGap: 14,
+  headerGap: 8,
+  infoRowHeight: 22,
+  assetGap: 12,
+  profileImageHeight: 230,
+  buttonHeight: 54,
+  ccWidthRatio: 0.9,
+  ccAspectRatio: 1.58,
+  ssnWidthRatio: 0.78,
+  ssnAspectRatio: 1.6,
+  wheelScrollSpeed: 0.45,
+});
 
-  topPad:              16,     // gap between panel top and first content item
-  bottomPad:           16,     // gap below last content item (before button bar)
-  sectionGap:          14,     // vertical gap between major sections
-  headerGap:           8,      // gap between a section header and its content
-  assetGap:            10,     // gap between an asset graphic and its info rows
-  infoRowHeight:       22,     // base row height used for row spacing math
-
-  profileImageHeight:  500,    // profile photo height in px
-
-  // credit card asset sizing
-  ccWidthRatio:        0.90,   // card width as fraction of contentWidth
-  ccAspectRatio:       0.63,   // card height = cardWidth * this ratio
-
-  // ssn card asset sizing
-  ssnWidthRatio:       0.85,
-  ssnAspectRatio:      0.50,
-
-  buttonHeight:        44,     // pinned button bar height in px
-  wheelScrollSpeed:    0.4,    // fraction of wheel deltaY applied per scroll event
+// profile detail scene typography and colors.
+export const DETAIL_STYLE = Object.freeze({
+  fontFamily: '"SF Pro Text", "Helvetica Neue", Arial, sans-serif',
+  bgColor: 0x0b0f17,
+  panelBgColor: 0x101725,
+  panelBorderColor: 0x3f5b82,
+  panelBorderWidth: 2,
+  dividerColor: 0x7a8ea9,
+  imageFallbackColor: 0x28364d,
+  nameFontSize: "32px",
+  nameColor: "#f4f8ff",
+  sectionHeaderFontSize: "20px",
+  sectionHeaderColor: "#9bc5ff",
+  infoKeyFontSize: "18px",
+  infoKeyColor: "#8fa4c2",
+  infoValFontSize: "18px",
+  infoValColor: "#f2f6ff",
+  btnFontSize: "20px",
 });
