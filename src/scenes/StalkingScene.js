@@ -12,12 +12,13 @@ export class StalkingScene extends Phaser.Scene {
         this.gameStarted = false;
         this.hasWon = false;
         this.hasLost = false;
-
+        
         this.setupMap();
         this.setupCharacters();
         this.setupObjects();
         this.setupLookBack();
         this.startCountdown();
+        this.showInstructions();
     }
 
     update(time, delta) {
@@ -37,6 +38,7 @@ export class StalkingScene extends Phaser.Scene {
         this.checkWinCondition();
     }
 
+    
     setupMap() {
         this.add.rectangle(
             this.width / 2,
@@ -77,7 +79,7 @@ export class StalkingScene extends Phaser.Scene {
         this.playerSpeed = 180;
         this.targetSpeed = 60;
     }
-
+    
     setupObjects() {
         this.objects = [];
         this.objectScrollSpeed = 90;
@@ -159,7 +161,7 @@ export class StalkingScene extends Phaser.Scene {
     }
 
     scheduleLookBack() {
-        const delay = Phaser.Math.Between(3000, 6000);
+        const delay = Phaser.Math.Between(2800, 5000);
 
         this.time.delayedCall(delay, () => {
             if (!this.scene.isActive()) return;
@@ -196,6 +198,19 @@ export class StalkingScene extends Phaser.Scene {
             this.target.setFillStyle(0xff4444);
             this.scheduleLookBack();
         });
+    }
+    showInstructions() {
+        this.instructionText = this.add.text(
+            this.target.x,
+            this.target.y - 100,
+            "Hide in the shadows before your target turns around!",
+            {
+                fontSize: "22px",
+                color: "#ffffff",
+                align: "center",
+                wordWrap: { width: 300 }
+            }
+        ).setOrigin(0.5).setDepth(100);
     }
 
     updateWarningPosition() {
@@ -252,7 +267,7 @@ export class StalkingScene extends Phaser.Scene {
     checkWinCondition() {
         if (this.hasWon) return;
 
-        if (this.time.now - this.survivalStartTime >= 15000) {
+        if (this.time.now - this.survivalStartTime >= 25000) {
             this.hasWon = true;
             this.gameStarted = false;
 

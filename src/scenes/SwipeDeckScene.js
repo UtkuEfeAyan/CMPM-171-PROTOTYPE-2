@@ -56,18 +56,14 @@ export class SwipeDeckScene extends Phaser.Scene {
   create() {
     this.setupBackground();
     this.setupCollectionButton();
-
     this.profiles = ProfileLoader.getValidProfiles(this);
     if (!this.profiles.length) return;
 
     this.bounds = this.computeBounds();
     this.bindSceneLifecycle();
     this.beginProgressiveLoad();
-    this.stalkKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.E);
-    this.input.keyboard.on("keydown-E", () => {
-      this.scene.start("stalkingScene");
-    });
   }
+  
 
   // phone background, sits behind every gameplay element.
   // never stretched - we fit-scale it (Math.min) so the phone frame keeps
